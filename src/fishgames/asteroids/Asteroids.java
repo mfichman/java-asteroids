@@ -4,6 +4,8 @@
  */
 package fishgames.asteroids;
 
+import org.jbox2d.common.Vec2;
+import org.jbox2d.dynamics.World;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -12,11 +14,13 @@ import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
 import org.lwjgl.opengl.PixelFormat;
-import org.lwjgl.util.Color;
 import org.lwjgl.util.vector.Vector3f;
 
 public class Asteroids {
 
+    public static World world = new World(new Vec2(0, 0), true);
+    
+    
     /**
      * @param args the command line arguments
      */
@@ -50,13 +54,28 @@ public class Asteroids {
         glEnable(GL_LINE_SMOOTH);
         glEnable(GL_MULTISAMPLE);   
         
+        long accum = 0;
+        long last = System.nanoTime();
+        float timestep = 1.f/60.f;
+        long increment = (long)(timestep * 1000000000);
+        
         while (!Display.isCloseRequested() && !Keyboard.isKeyDown(Keyboard.KEY_ESCAPE)) {
+            long current = System.nanoTime();
+            
+            
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             if (Display.isVisible()) {
-                rock.render();
-                ship.render();
+                accum += current - last;
+                while (accum >= increment) {
+                    world.step(timestep, 10, 10);
+                    accum -= increment;
+                }
+                float interp = (float)accum/(float)increment;
+                rock.render(interp);
+                ship.render(interp);
                 Display.update();
             }
+            last = current;
             Display.sync(60);
         }
         Display.destroy();
