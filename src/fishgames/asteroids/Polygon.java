@@ -48,7 +48,7 @@ public class Polygon implements Renderable {
     }
 
     @Override
-    public void render() {
+    public void render(float alpha) {
         glEnableClientState(GL_VERTEX_ARRAY);
         glBindBuffer(GL_ARRAY_BUFFER, this.vertices);
         glVertexPointer(2, GL_FLOAT, 0, 0);

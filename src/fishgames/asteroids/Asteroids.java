@@ -59,9 +59,9 @@ public class Asteroids {
         float timestep = 1.f/60.f;
         long increment = (long)(timestep * 1000000000);
         
+        
         while (!Display.isCloseRequested() && !Keyboard.isKeyDown(Keyboard.KEY_ESCAPE)) {
             long current = System.nanoTime();
-            
             
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             if (Display.isVisible()) {
@@ -78,7 +78,7 @@ public class Asteroids {
                 Display.update();
             }
             last = current;
-            Display.sync(60);
+           // Display.sync(60);
         }
         Display.destroy();
     }

@@ -19,20 +19,20 @@ class OutlinedObject implements Renderable {
     protected Vector3f outlineColor;
     protected Vector3f outlineScale;
     
-    public void render() {
+    public void render(float alpha) {
         if (this.outlineColor != null) {
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(-20f, -20f);        
             glPushMatrix();
             glScalef(this.outlineScale.x, this.outlineScale.y, this.outlineScale.z);       
             glColor3f(this.outlineColor.x, this.outlineColor.y, this.outlineColor.z);
-            this.polygon.render();
+            this.polygon.render(alpha);
             glPopMatrix();
             glDisable(GL_POLYGON_OFFSET_FILL);
         }
         
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glColor3f(this.fillColor.x, this.fillColor.y, this.fillColor.z);
-        this.polygon.render();
+        this.polygon.render(alpha);
     }
 }

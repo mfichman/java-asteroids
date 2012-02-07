@@ -74,8 +74,8 @@ public class Rock extends OutlinedObject implements Renderable {
         glPushMatrix();
         glTranslatef(this.x, this.y, 0.f);
         glRotatef(this.rotation, 0, 0, 1.f); // Rotate around z-axis
-        this.rotation += 0.2;
-        super.render();
+        this.rotation += 0.02;
+        super.render(alpha);
         glPopMatrix();
     }
 }

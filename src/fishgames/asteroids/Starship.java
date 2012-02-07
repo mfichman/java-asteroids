@@ -52,12 +52,11 @@ public class Starship extends OutlinedObject implements Renderable {
     
     @Override
     public void render(float alpha) {  
-        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, 100.f));
+        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, 4.f));
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
             this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_K)) {
-            //this.y += 0.2;
             this.body.applyLinearImpulse(forward, this.body.getWorldCenter());
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_J) && !Keyboard.isKeyDown(Keyboard.KEY_L)) {
@@ -79,9 +78,9 @@ public class Starship extends OutlinedObject implements Renderable {
         glRotatef((float)(this.body.getAngle() * 180.f / Math.PI), 0, 0, 1.f); 
         // Rotate around z-axis
         
-        super.render();
+        super.render(alpha);
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
-            this.mainThruster.render();
+            this.mainThruster.render(alpha);
         }
         glPopMatrix();
     }
