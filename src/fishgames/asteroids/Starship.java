@@ -42,28 +42,32 @@ public class Starship extends OutlinedObject implements Renderable {
         vert.put(6, 20.f); // Left wing # 3
         vert.put(7, 20.f);
         setVertices(vert);
-        
-        Vec2[] boxVert = new Vec2[vert.limit()/2];
-        for (int i = 0; i < boxVert.length; i++) {
-            boxVert[i] = new Vec2(vert.get(2 * i), vert.get(2 * i + 1));
-        }
-        PolygonShape shape = new PolygonShape();
-        //shape.set(boxVert, boxVert.length);
-        shape.setAsBox(10, 10);
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyType.DYNAMIC;
-        this.body = Asteroids.world.createBody(bodyDef);
-        this.body.createFixture(shape, 1.f);
-        this.body.setTransform(new Vec2(1.f, 1.f), 0.f);
-        
+
         IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
         ind.put(0, 0); // Right side
         ind.put(1, 1);
         ind.put(2, 2);
         ind.put(3, 0); // Left side
-        ind.put(4, 3);
-        ind.put(5, 2);   
+        ind.put(4, 2);
+        ind.put(5, 3);   
         setIndices(ind);
+        
+                
+        Vec2[] boxVert = new Vec2[ind.limit()];
+        for (int i = 0; i < ind.limit(); i++) {
+            float px = .1f * vert.get(2 * ind.get(i));
+            float py = .1f * vert.get(2 * ind.get(i) + 1);
+            boxVert[i] = new Vec2(px, py);
+            System.out.printf("%f %f\n", px, py);
+        }
+        PolygonShape shape = new PolygonShape();
+        shape.set(boxVert, boxVert.length);
+        //shape.setAsBox(10, 10);
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.type = BodyType.DYNAMIC;
+        this.body = Asteroids.world.createBody(bodyDef);
+        this.body.createFixture(shape, 1.f);
+        this.body.setTransform(new Vec2(10.f, 10.f), 0.f);
         
         vert.put(0, 0.f);
         vert.put(1, 13.f);
@@ -85,7 +89,7 @@ public class Starship extends OutlinedObject implements Renderable {
     
     @Override
     public void render(float alpha) {  
-        Vec2 forward = body.getWorldVector(new Vec2(0.f, 100.f));
+        Vec2 forward = body.getWorldVector(new Vec2(0.f, 6.f));
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
             //this.y -= 0.2;
             body.applyLinearImpulse(forward.negate(), body.getWorldCenter());
