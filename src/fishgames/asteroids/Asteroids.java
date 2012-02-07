@@ -12,7 +12,6 @@ import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
 import org.lwjgl.opengl.PixelFormat;
-import org.lwjgl.util.Color;
 import org.lwjgl.util.vector.Vector3f;
 
 public class Asteroids {

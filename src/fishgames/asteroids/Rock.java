@@ -34,9 +34,9 @@ public class Rock extends OutlinedObject implements Renderable {
      * @param diameter size of the rock
      */
     public Rock(float diameter, int segments) {
-        outlineColor = new Vector3f(.6f, .6f, .6f);
-        fillColor = new Vector3f(.2f, .2f, .2f);
-        outlineScale = new Vector3f(1.02f, 1.02f, 1.02f);
+        this.outlineColor = new Vector3f(.6f, .6f, .6f);
+        this.fillColor = new Vector3f(.2f, .2f, .2f);
+        this.outlineScale = new Vector3f(1.02f, 1.02f, 1.02f);
         
         // Create one vertex per segment.  Each vertex has 2 coordinates.
         // Remember to save one vertex for the center point.
@@ -53,8 +53,7 @@ public class Rock extends OutlinedObject implements Renderable {
             
         }
         vert.put(0, 0); // The center point is (0, 0, 0)
-        vert.put(0, 1);        
-        setVertices(vert);
+        vert.put(0, 1);
         
         // Create one triangle per segment by binding the correct vertices.
         IntBuffer ind = BufferUtils.createIntBuffer(3 * segments);
@@ -67,7 +66,7 @@ public class Rock extends OutlinedObject implements Renderable {
                 ind.put(3 * i + 2, i + 2); // Top right
             }
         } 
-        setIndices(ind);
+        this.polygon = new Polygon(vert, ind);
     }
     
     @Override
