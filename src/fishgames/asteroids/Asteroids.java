@@ -59,16 +59,18 @@ public class Asteroids {
         float timestep = 1.f/60.f;
         long increment = (long)(timestep * 1000000000);
         
+        
         while (!Display.isCloseRequested() && !Keyboard.isKeyDown(Keyboard.KEY_ESCAPE)) {
             long current = System.nanoTime();
-            
             
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             if (Display.isVisible()) {
                 accum += current - last;
+                int num = 0;
                 while (accum >= increment) {
                     world.step(timestep, 10, 10);
                     accum -= increment;
+                    num++;
                 }
                 float interp = (float)accum/(float)increment;
                 rock.render(interp);
@@ -76,7 +78,7 @@ public class Asteroids {
                 Display.update();
             }
             last = current;
-            Display.sync(60);
+           // Display.sync(60);
         }
         Display.destroy();
     }
