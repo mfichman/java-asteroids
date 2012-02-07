@@ -7,6 +7,11 @@ package fishgames.asteroids;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import org.jbox2d.collision.shapes.PolygonShape;
+import org.jbox2d.common.Vec2;
+import org.jbox2d.dynamics.Body;
+import org.jbox2d.dynamics.BodyDef;
+import org.jbox2d.dynamics.BodyType;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
 import static org.lwjgl.opengl.GL11.*;
@@ -17,21 +22,11 @@ import org.lwjgl.util.vector.Vector3f;
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Starship extends OutlinedObject implements Renderable {
-
-    /** Angle of rotation */
-    private float rotation;
-    
-    /** Position */
-    public float x = 200;
-    private float y = 200;
-    
-    /** Velocity */
-    public float dx = 200;
-    public float dy = 200;
     
     private OutlinedObject mainThruster = new OutlinedObject();
     private OutlinedObject leftThruster = new OutlinedObject();
     private OutlinedObject rightThruster = new OutlinedObject();
+    private Body body;
     
     public Starship(Vector3f color) {
         this.fillColor = color;
@@ -41,25 +36,53 @@ public class Starship extends OutlinedObject implements Renderable {
 
         this.mainThruster.polygon = getMainThrusterPolygon();
         this.mainThruster.fillColor = new Vector3f(1.0f, .85f, 0.2f);
-        //mainThruster.outlineColor = new Vector3f(1.0f, .2f, 0.0f);
-        //mainThruster.outlineScale = new Vector3f(1.09f, 1.12f, 1.09f);
+
+        
+        PolygonShape shape = new PolygonShape();
+        //shape.set(boxVert, boxVert.length);
+        shape.setAsBox(10, 10);
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.type = BodyType.DYNAMIC;
+        this.body = Asteroids.world.createBody(bodyDef);
+        this.body.createFixture(shape, 1.f);
+        this.body.setTransform(new Vec2(1.f, 1.f), 0.f);
+        
+        
     }
     
     @Override
-    public void render() {    
-        glPushMatrix();
-        glTranslatef(this.x, this.y, 0.f);
-        glRotatef(this.rotation, 0, 0, 1.f); // Rotate around z-axis
-        
+    public void render(float alpha) {  
+        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, 100.f));
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
-            this.y -= 0.2;
-            this.mainThruster.render();
+            this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_K)) {
-            this.y += 0.2;
+            //this.y += 0.2;
+            this.body.applyLinearImpulse(forward, this.body.getWorldCenter());
         }
-
+        if (Keyboard.isKeyDown(Keyboard.KEY_J) && !Keyboard.isKeyDown(Keyboard.KEY_L)) {
+            this.body.setAngularVelocity(-4.f);
+        } else if (Keyboard.isKeyDown(Keyboard.KEY_L) && !Keyboard.isKeyDown(Keyboard.KEY_J)) {
+            this.body.setAngularVelocity(4.f);
+        } else {
+            this.body.setAngularVelocity(0.f);
+        }
+        
+        Vec2 pos = this.body.getPosition();
+        Vec2 vel = this.body.getLinearVelocity();
+        Vec2 pos1 = pos.mul(1 - alpha);
+        Vec2 pos2 = (pos.add(vel.mul(1.f/60.f))).mul(alpha);
+        Vec2 finalPos = pos1.add(pos2).mul(10);    
+          
+        glPushMatrix();
+        glTranslatef(finalPos.x, finalPos.y, 0.f);
+        glRotatef((float)(this.body.getAngle() * 180.f / Math.PI), 0, 0, 1.f); 
+        // Rotate around z-axis
+        
         super.render();
+        if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
+            this.mainThruster.render();
+        }
         glPopMatrix();
     }
     
