@@ -15,47 +15,56 @@ import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.*;
 import org.lwjgl.BufferUtils;
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11.glPopMatrix;
+import static org.lwjgl.opengl.GL11.glPushMatrix;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
- *
+ * Procedurally-generated rock/asteroid constructed as a polygon, and modeled
+ * physically as a circle.
+ * 
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Rock extends OutlinedObject implements Renderable {
 
-    public static int TYPE = 0x1;
-    public static int MASK = Starship.TYPE; // | Projectile.TYPE;
     private Body body;
     private float radius;
-    
+    private static float DENSITY = 1.0f;
+    private static float MARGIN = 0.05f; // Collision margin (to avoid gaps)
+    public static int TYPE = 0x1;
+    public static int MASK = Starship.TYPE; // | Projectile.TYPE;
+
     /**
      * Creates a new randomly-shaped Rock object with the given diameter.
+     *
      * @param diameter size of the rock
      */
     public Rock(float radius, int segments) {
         this.outlineColor = new Vector3f(.6f, .6f, .6f);
         this.fillColor = new Vector3f(.2f, .2f, .2f);
         this.outlineScale = new Vector3f(1.02f, 1.02f, 1.02f);
+        // Fudged to make the outline look good.
+
         this.radius = radius;
-        
+
         // Create one vertex per segment.  Each vertex has 2 coordinates.
         // Remember to save one vertex for the center point.
         FloatBuffer vert = BufferUtils.createFloatBuffer(2 * (segments + 1));
         double angle = 2. * Math.PI / segments;
         for (int i = 0; i < segments; i++) {
             // Skew the angle and diameter by up to 10% in either direction.
+            // This is a bit of a 'magic' equation to make the rocks look right.
             double diameterSkew = (Math.random() - 0.5) * radius * 0.3;
             double angleSkew = 0; //(Math.random() - 0.5) * angle;
             double px = (diameterSkew + radius) * Math.cos(angleSkew + angle * i);
             double py = (diameterSkew + radius) * Math.sin(angleSkew + angle * i);
-            vert.put((i + 1) * 2 + 0, (float)px);
-            vert.put((i + 1) * 2 + 1, (float)py);
-            
+            vert.put((i + 1) * 2 + 0, (float) px);
+            vert.put((i + 1) * 2 + 1, (float) py);
+
         }
         vert.put(0, 0); // The center point is (0, 0, 0)
         vert.put(0, 1);
-        
+
         // Create one triangle per segment by binding the correct vertices.
         IntBuffer ind = BufferUtils.createIntBuffer(3 * segments);
         for (int i = 0; i < segments; i++) {
@@ -66,27 +75,35 @@ public class Rock extends OutlinedObject implements Renderable {
             } else {
                 ind.put(3 * i + 2, i + 2); // Top right
             }
-        } 
+        }
         this.polygon = new Polygon(vert, ind, false);
-        
+
         CircleShape shape = new CircleShape();
-        shape.m_radius = radius - 0.02f;
+        shape.m_radius = radius - MARGIN;
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.DYNAMIC;
         this.body = Asteroids.world.createBody(bodyDef);
-        this.body.setTransform(new Vec2(25.f, 25.f), 0.f);
         this.body.setLinearDamping(0.f);
-        Fixture fixture = this.body.createFixture(shape, 1.f);
+        Fixture fixture = this.body.createFixture(shape, DENSITY);
         Filter filter = new Filter();
         filter.categoryBits = TYPE;
         filter.maskBits = MASK;
         fixture.setFilterData(filter);
     }
-    
+
+    /**
+     * Updates the rock (and wraps the transform).
+     */
+    @Override
     public void update() {
         Asteroids.wrapTransform(this.body);
     }
-    
+
+    /**
+     * Render the rock with interpolation value 'alpha'.
+     *
+     * @param alpha
+     */
     @Override
     public void render(float alpha) {
         glPushMatrix();
@@ -94,7 +111,7 @@ public class Rock extends OutlinedObject implements Renderable {
         super.render(alpha);
         glPopMatrix();
     }
-    
+
     /**
      * Releases the rock and returns it to the pool of other rocks.
      */
@@ -107,11 +124,12 @@ public class Rock extends OutlinedObject implements Renderable {
         }
         queue.add(this);
     }
-    
+
     /**
      * Gets a rock of the given size, or creates one.
+     *
      * @param radius
-     * @return 
+     * @return
      */
     public static Rock getRock(Float radius) {
         Queue<Rock> queue = released.get(radius);
@@ -121,12 +139,11 @@ public class Rock extends OutlinedObject implements Renderable {
         } else {
             rock = new Rock(radius, 16);
         }
-        float x = (float)(Math.random() * Asteroids.getWorldSize().x);
-        float y = (float)(Math.random() * Asteroids.getWorldSize().y);
-        
+        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
+        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
+
         rock.body.setTransform(new Vec2(x, y), 0.f);
         return rock;
     }
-    
     public static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
 }

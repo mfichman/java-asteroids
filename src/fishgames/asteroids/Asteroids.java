@@ -15,20 +15,26 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Vector3f;
 
+/**
+ * Big huge static class to hold all the game-specific info, like world size,
+ * pointers to useful objects, utility methods, etc.
+ *
+ * @author Matt Fichman <matt.fichman@gmail.com>
+ */
 public class Asteroids {
 
     public static World world = new World(new Vec2(0, 0), true);
-    public static Set<Renderable> renderable = new HashSet<Renderable>();
-    public static long accum = 0;
-    public static long last = System.nanoTime();
-    public static float timestep = 1.f / 60.f;
+    private static Set<Renderable> renderable = new HashSet<Renderable>();
+    private static long accum = 0;
+    private static long last = System.nanoTime();
+    private static float timestep = 1.f / 60.f;
 
     /**
-     * Returns the size of the world in meters.
+     * Returns the size of the world in world units (kind-of-meters).
      *
      * @return
      */

@@ -15,6 +15,8 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 /**
+ * Holder for a polygon (graphical and physical models). Since all the objects
+ * in the game are polygons, most of them use this in some way.
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
@@ -32,7 +34,6 @@ public class Polygon implements Renderable {
      * Number of triangles
      */
     private int numElements;
-    
     /**
      * Polygon shape for Box2D
      */
@@ -53,18 +54,42 @@ public class Polygon implements Renderable {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         this.numElements = ind.limit();
     }
-    
+
+    /**
+     * Adds a new shape (doesn't affect the look of the polygon; it's just
+     * convenient to have the physical model attached to the graphical one).
+     *
+     * @param shape
+     */
     public void addShape(PolygonShape shape) {
         if (this.shape == null) {
             this.shape = new ArrayList<PolygonShape>();
         }
         this.shape.add(shape);
     }
-    
+
+    /**
+     * Return a list of graphical models used to create fixtures for objects
+     * that use this polygon for physical simulations.
+     *
+     * @return
+     */
     public List<PolygonShape> getShapes() {
         return this.shape;
     }
 
+    /**
+     * Updates this object. Unused; no animation.
+     */
+    @Override
+    public void update() {
+    }
+
+    /**
+     * Renders this object with interpolation constant alpha.
+     *
+     * @param alpha
+     */
     @Override
     public void render(float alpha) {
         glEnableClientState(GL_VERTEX_ARRAY);
@@ -76,6 +101,10 @@ public class Polygon implements Renderable {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
+    /**
+     * Releases this object (specifically, by freeing the hardware vertex and
+     * index buffers).
+     */
     public void release() {
         IntBuffer buf = BufferUtils.createIntBuffer(2);
         buf.put(0, this.vertices);

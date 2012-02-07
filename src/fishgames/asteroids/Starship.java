@@ -10,35 +10,43 @@ import java.nio.IntBuffer;
 import org.jbox2d.collision.shapes.PolygonShape;
 import org.jbox2d.collision.shapes.Shape;
 import org.jbox2d.common.Vec2;
-import org.jbox2d.dynamics.Body;
-import org.jbox2d.dynamics.BodyDef;
-import org.jbox2d.dynamics.BodyType;
-import org.jbox2d.dynamics.Filter;
-import org.jbox2d.dynamics.Fixture;
+import org.jbox2d.dynamics.*;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11.glPopMatrix;
+import static org.lwjgl.opengl.GL11.glPushMatrix;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
- *
+ * Procedurally-generated starship (constructed as a quadrilateral); modeled as 
+ * a pair of triangles.
+ * 
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Starship extends OutlinedObject implements Renderable {
-    
+   
     private OutlinedObject mainThruster = new OutlinedObject();
     private OutlinedObject leftThruster = new OutlinedObject();
     private OutlinedObject rightThruster = new OutlinedObject();
     private Body body;
     
     private static float SCALE = 0.8f;
+    private static float DENSITY = 1.0f;
+    private static float THRUST = 4.f;
+    private static float SPIN = 4.f;
     public static int TYPE = 0x2;
-    public static int MASK = Starship.TYPE | Rock.TYPE;
+    public static int MASK = Starship.TYPE | Rock.TYPE; // | Projectile.TYPE | Upgrade.TYPE
     
+    /**
+     * Creates a new starship with the given color.
+     * @param color 
+     */
     public Starship(Vector3f color) {
         this.fillColor = color;
         this.outlineColor = new Vector3f(1.f, 1.f, 1.f);
         this.outlineScale = new Vector3f(1.08f, 1.08f, 1.08f);
+        // This is just fudged to make the outline look good.
+        
         this.polygon = getHullPolygon();
 
         this.mainThruster.polygon = getMainThrusterPolygon();
@@ -48,17 +56,21 @@ public class Starship extends OutlinedObject implements Renderable {
         bodyDef.type = BodyType.DYNAMIC;
         this.body = Asteroids.world.createBody(bodyDef);
         for (Shape shape : this.polygon.getShapes()) {
-            Fixture fixture = this.body.createFixture(shape, 1.f);
+            Fixture fixture = this.body.createFixture(shape, DENSITY);
             Filter filter = new Filter();
             filter.categoryBits = TYPE;
             filter.maskBits = MASK;
             fixture.setFilterData(filter);
         }
-        this.body.setTransform(new Vec2(10.f, 10.f), 0.f);
+        body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
     }
     
+    /**
+     * Applies forces to the starship, and updates the transform.
+     */
+    @Override
     public void update() {
-        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, 4.f));
+        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, THRUST));
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
             this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
         }
@@ -66,15 +78,19 @@ public class Starship extends OutlinedObject implements Renderable {
             this.body.applyLinearImpulse(forward, this.body.getWorldCenter());
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_J) && !Keyboard.isKeyDown(Keyboard.KEY_L)) {
-            this.body.setAngularVelocity(-4.f);
+            this.body.setAngularVelocity(-SPIN);
         } else if (Keyboard.isKeyDown(Keyboard.KEY_L) && !Keyboard.isKeyDown(Keyboard.KEY_J)) {
-            this.body.setAngularVelocity(4.f);
+            this.body.setAngularVelocity(SPIN);
         } else {
             this.body.setAngularVelocity(0.f);
         }
         Asteroids.wrapTransform(this.body);
     }
     
+    /**
+     * Renders the starship, with interpolation factor 'alpha'.
+     * @param alpha 
+     */
     @Override
     public void render(float alpha) {
         glPushMatrix();
@@ -86,6 +102,10 @@ public class Starship extends OutlinedObject implements Renderable {
         glPopMatrix();
     }
     
+    /**
+     * Returns the polygon shape for the hull of the starship.
+     * @return 
+     */
     static Polygon getHullPolygon() {
         if (hullPolygon == null) {
             FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 4);
@@ -126,6 +146,10 @@ public class Starship extends OutlinedObject implements Renderable {
         return hullPolygon;
     }
     
+    /**
+     * Returns the shape for the main thruster of the starship.
+     * @return 
+     */
     static Polygon getMainThrusterPolygon() {
         if (mainThrusterPolygon == null) {
             FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 4);
