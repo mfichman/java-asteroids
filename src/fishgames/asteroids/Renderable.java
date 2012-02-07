@@ -12,4 +12,5 @@ package fishgames.asteroids;
 interface Renderable {
     
     public void render(float alpha);
+    public void update();
 }
