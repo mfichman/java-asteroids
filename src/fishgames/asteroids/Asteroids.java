@@ -4,11 +4,15 @@
  */
 package fishgames.asteroids;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.PriorityQueue;
 import java.util.Set;
+import org.jbox2d.collision.shapes.CircleShape;
+import org.jbox2d.collision.shapes.Shape;
 import org.jbox2d.common.Vec2;
-import org.jbox2d.dynamics.Body;
-import org.jbox2d.dynamics.World;
+import org.jbox2d.dynamics.*;
+import org.jbox2d.dynamics.contacts.Contact;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -27,12 +31,23 @@ import org.lwjgl.util.vector.Vector3f;
  */
 public class Asteroids {
 
-    public static World world = new World(new Vec2(0, 0), true);
-    private static Set<Renderable> renderable = new HashSet<Renderable>();
+    private static World world = new World(new Vec2(0, 0), true);
+    private static Set<Renderable> renderables = new HashSet<Renderable>();
+    private static ArrayList<Renderable> working = new ArrayList<Renderable>();
     private static long accum = 0;
     private static long last = System.nanoTime();
     private static float timestep = 1.f / 60.f;
+    private static boolean renderablesDirty = false;
 
+
+    /**
+     * @return the renderable objects
+     */
+    public static void add(Renderable renderable) {
+        renderables.add(renderable);
+        renderablesDirty = true;
+    }
+    
     /**
      * Returns the size of the world in world units (kind-of-meters).
      *
@@ -40,6 +55,16 @@ public class Asteroids {
      */
     public static Vec2 getWorldSize() {
         return new Vec2(80, 80);
+    }
+    
+    /**
+     * Returns a random position on the map.
+     * @return 
+     */
+    public static Vec2 getRandomPos() {
+        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
+        float y = (float) (Math.random() * Asteroids.getWorldSize().x);
+        return new Vec2(x, y);
     }
 
     /**
@@ -65,6 +90,45 @@ public class Asteroids {
         glTranslatef(finalPos.x, finalPos.y, 0.f);
         glRotatef((float) (finalAngle * 180.f / Math.PI), 0, 0, 1.f);
         // Rotate around z-axis
+    }
+    
+
+    /**
+     * Creates a new body using this shape.
+     * @return 
+     */
+    public static Body getBody(Polygon polygon, int type, int mask, float density) {
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.type = BodyType.DYNAMIC;
+        Body body = Asteroids.world.createBody(bodyDef);
+        if (polygon.getShapes() != null) {
+            for (Shape shape : polygon.getShapes()) {
+                Fixture fixture = body.createFixture(shape, density);
+                Filter filter = new Filter();
+                filter.categoryBits = type;
+                filter.maskBits = mask;
+                fixture.setFilterData(filter);
+            }
+        }
+        body.setLinearDamping(0.f);
+        return body;
+    }
+    
+    /**
+     * Returns a circle body.
+     */
+    public static Body getBody(float radius, int type, int mask, float density) {
+        CircleShape shape = new CircleShape();
+        shape.m_radius = radius;
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.type = BodyType.DYNAMIC;
+        Body body = Asteroids.world.createBody(bodyDef);
+        Fixture fixture = body.createFixture(shape, density);
+        Filter filter = new Filter();
+        filter.categoryBits = type;
+        filter.maskBits = mask;
+        fixture.setFilterData(filter);
+        return body;
     }
 
     /**
@@ -93,27 +157,62 @@ public class Asteroids {
      */
     public static void update() {
         long increment = (long) (timestep * 1000000000);
-        long current = System.nanoTime();
+        long time = System.nanoTime();
+
+        if (!Display.isVisible()) {
+            last = time;
+            return;
+        }
+        
+        if (renderablesDirty) {
+            renderablesDirty = false;
+            working.clear();
+            working.addAll(Asteroids.renderables);
+        }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if (Display.isVisible()) {
-            accum += current - last;
-            int num = 0;
-            while (accum >= increment) {
-                world.step(timestep, 10, 10);
-                accum -= increment;
-                num++;
-                for (Renderable object : Asteroids.renderable) {
-                    object.update();
+
+        // Update all objects and tasks in the task queue.
+        accum += time - last;
+        while (accum >= increment) {
+            world.step(timestep, 10, 10);
+            accum -= increment;
+            for (Contact c = world.getContactList(); c != null; c = c.getNext()) {
+                Object a = c.getFixtureA().getBody().getUserData();
+                Object b = c.getFixtureB().getBody().getUserData();
+                if (a != null && b != null && c.isTouching()) {
+                    Collidable ca = (Collidable) a;
+                    Collidable cb = (Collidable) b;
+                    ca.dispatch(cb);
+                    cb.dispatch(ca);
                 }
             }
-            float interp = (float) accum / (float) increment;
-            for (Renderable object : Asteroids.renderable) {
-                object.render(interp);
+            for (Renderable object : working) {
+                object.update(timestep);
             }
-            Display.update();
+
         }
-        last = current;
+
+        // Update all current tasks
+        PriorityQueue<Task> tasks = Task.getActiveTasks();
+        while (!tasks.isEmpty() && tasks.peek().getDeadline() <= time) {
+            Task task = tasks.remove();
+            if (task.update()) {
+                task.setDeadline();
+                tasks.add(task);
+            } else {
+                task.setDeadline(0);
+            }
+        }
+
+        // Render all objects; be sure to pass the 'frame' remainder'
+        float interp = (float) accum / (float) increment;
+        for (Renderable object : working) {
+            object.render(interp);
+        }
+
+        Display.update();
+        last = time;
     }
 
     /**
@@ -147,9 +246,9 @@ public class Asteroids {
         glScalef(10.f, 10.f, 10.f);
 
         for (int i = 0; i < 8; i++) {
-            renderable.add(Rock.getRock(6.f));
+            add(Rock.getRock(6.f));
         }
-        renderable.add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
+        add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
         glEnable(GL_LINE_SMOOTH);
         glEnable(GL_MULTISAMPLE);
 

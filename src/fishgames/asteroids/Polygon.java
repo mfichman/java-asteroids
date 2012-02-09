@@ -10,6 +10,7 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.jbox2d.collision.shapes.PolygonShape;
+import org.jbox2d.common.Vec2;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -39,7 +40,7 @@ public class Polygon implements Renderable {
      */
     private ArrayList<PolygonShape> shape;
 
-    public Polygon(FloatBuffer vert, IntBuffer ind, boolean makeShape) {
+    public Polygon(FloatBuffer vert, IntBuffer ind) {
         IntBuffer intBuf = BufferUtils.createIntBuffer(2);
         glGenBuffers(intBuf);
         this.vertices = intBuf.get(0);
@@ -80,9 +81,11 @@ public class Polygon implements Renderable {
 
     /**
      * Updates this object. Unused; no animation.
+     *
+     * @param delta
      */
     @Override
-    public void update() {
+    public void update(float delta) {
     }
 
     /**
@@ -112,5 +115,49 @@ public class Polygon implements Renderable {
         glDeleteBuffers(buf);
         this.vertices = 0;
         this.indices = 0;
+    }
+    
+    public static Polygon getSquare(float size) {
+        FloatBuffer vert = BufferUtils.createFloatBuffer(8);
+        
+        vert.put(0, size); // Upper left
+        vert.put(1, size);
+        
+        vert.put(2, size); // Upper right
+        vert.put(3, -size);
+
+        vert.put(4, -size); // Lower right
+        vert.put(5, -size);
+        
+        vert.put(6, -size); // Lower left
+        vert.put(7, size);
+
+        System.out.printf("%f\n", size);
+        
+        IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
+        ind.put(0, 0); // Right side
+        ind.put(1, 1);
+        ind.put(2, 2);
+        ind.put(3, 0); // Left side
+        ind.put(4, 3);
+        ind.put(5, 2);
+
+        Polygon polygon = new Polygon(vert, ind);
+        Vec2[] triangle1 = new Vec2[3];
+        triangle1[0] = new Vec2(vert.get(0), vert.get(1));
+        triangle1[1] = new Vec2(vert.get(2), vert.get(3));
+        triangle1[2] = new Vec2(vert.get(4), vert.get(5));
+        PolygonShape shape1 = new PolygonShape();
+        shape1.set(triangle1, triangle1.length);
+        polygon.addShape(shape1);
+
+        Vec2[] triangle2 = new Vec2[3];
+        triangle2[0] = new Vec2(vert.get(0), vert.get(1));
+        triangle2[1] = new Vec2(vert.get(4), vert.get(5));
+        triangle2[2] = new Vec2(vert.get(6), vert.get(7));
+        PolygonShape shape2 = new PolygonShape();
+        shape2.set(triangle2, triangle2.length);
+        polygon.addShape(shape2);
+        return polygon;
     }
 }
