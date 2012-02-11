@@ -5,7 +5,6 @@
  */
 package fishgames.asteroids;
 
-import fishgames.asteroids.Collidable;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.HashMap;
@@ -35,6 +34,9 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
     private static float MARGIN = 0.05f; // Collision margin (to avoid gaps)
     public static int TYPE = 0x1;
     public static int MASK = Starship.TYPE | Projectile.TYPE;
+    public static float SMALL = 3.0f;
+    public static float MEDIUM = 4.0f;
+    public static float LARGE = 6.0f;
 
     /**
      * Creates a new randomly-shaped Rock object with the given diameter.
@@ -118,37 +120,8 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
         }
         queue.add(this);
     }
-
-    /**
-     * Gets a rock of the given size, or creates one.
-     *
-     * @param radius
-     * @return
-     */
-    public static Rock getRock(Float radius) {
-        Queue<Rock> queue = released.get(radius);
-        Rock rock;
-        if (queue != null && queue.size() > 0) {
-            rock = queue.remove();
-        } else {
-            rock = new Rock(radius, 16);
-        }
-        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
-        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
-
-        rock.body.setTransform(new Vec2(x, y), 0.f);
-        
-        float speed = (float) (Math.random() * (MAXSPEED - MINSPEED)) + MINSPEED;
-        float angle = (float) (2 * Math.PI * Math.random());
-        float dx = (float) (speed * Math.cos(angle));
-        float dy = (float) (speed * Math.sin(angle));
-        
-        rock.body.setLinearVelocity(new Vec2(dx, dy));
-        
-        return rock;
-    }
-    public static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
-
+    
+    
     @Override
     public void dispatch(Collidable other) {
         other.collide(this);
@@ -165,4 +138,55 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
     @Override
     public void collide(Starship other) {
     }
+    
+    public void destroy() {
+        this.release();
+        if (this.radius == LARGE) {
+            for(int i = 0; i < 4; i++) {
+                Asteroids.add(getRock(MEDIUM, this.body.getPosition()));
+            }
+        } else if (this.radius == MEDIUM) {
+            for(int i = 0; i < 4; i++) {
+                Asteroids.add(getRock(SMALL, this.body.getPosition()));
+            }
+        }
+    }
+
+    /**
+     * Gets a rock of the given size, or creates one.
+     *
+     * @param radius
+     * @param position
+     * @return
+     */
+    public static Rock getRock(float radius, Vec2 position) {
+        Queue<Rock> queue = released.get(radius);
+        Rock rock;
+        if (queue != null && queue.size() > 0) {
+            rock = queue.remove();
+        } else {
+            rock = new Rock(radius, 16);
+        }
+
+        rock.body.setTransform(position, 0.f);
+        
+        float speed = (float) (Math.random() * (MAXSPEED - MINSPEED)) + MINSPEED;
+        float angle = (float) (2 * Math.PI * Math.random());
+        float dx = (float) (speed * Math.cos(angle));
+        float dy = (float) (speed * Math.sin(angle));
+        
+        rock.body.setLinearVelocity(new Vec2(dx, dy));
+        
+        return rock;
+    }
+    
+    public static Rock getRock(float radius) {
+        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
+        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
+        
+        return getRock(radius, new Vec2(x, y));
+    }
+    
+    public static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
+
 }

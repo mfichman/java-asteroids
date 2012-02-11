@@ -15,11 +15,11 @@ import org.lwjgl.util.vector.Vector3f;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Photon extends OutlinedObject implements Projectile, Renderable {
+public class Photon extends OutlinedObject implements Projectile, Renderable, Collidable {
     
     private Body body;
     private static float SCALE = .2f;
-    private static float SPEED = 30.f;
+    private static float SPEED = 40.f;
     
     public Photon() {
         this.polygon = getBodyPolygon();
@@ -72,5 +72,22 @@ public class Photon extends OutlinedObject implements Projectile, Renderable {
 
     
     static Polygon bodyPolygon;
+
+    @Override
+    public void dispatch(Collidable other) {
+        other.collide(this);
+    }
+
+    @Override
+    public void collide(Projectile other) {
+    }
+
+    @Override
+    public void collide(Rock other) {
+    }
+
+    @Override
+    public void collide(Starship other) {
+    }
     
 }
