@@ -44,7 +44,7 @@ public class Starship extends OutlinedObject implements Renderable {
     public Starship(Vector3f color) {
         this.fillColor = color;
         this.outlineColor = new Vector3f(1.f, 1.f, 1.f);
-        this.outlineScale = new Vector3f(1.08f, 1.08f, 1.08f);
+        this.outlineScale = new Vector3f(1.12f, 1.12f, 1.12f);
         // This is just fudged to make the outline look good.
         
         this.polygon = getHullPolygon();
