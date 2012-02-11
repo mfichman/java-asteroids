@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
-import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.*;
 import org.lwjgl.BufferUtils;
@@ -25,14 +24,19 @@ import org.lwjgl.util.vector.Vector3f;
  * 
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Rock extends OutlinedObject implements Renderable {
+public class Rock extends OutlinedObject implements Renderable, Collidable {
 
     private Body body;
     private float radius;
+    private static float MINSPEED = 2.0f;
+    private static float MAXSPEED = 6.0f;
     private static float DENSITY = 1.0f;
     private static float MARGIN = 0.05f; // Collision margin (to avoid gaps)
     public static int TYPE = 0x1;
-    public static int MASK = Starship.TYPE; // | Projectile.TYPE;
+    public static int MASK = Starship.TYPE | Projectile.TYPE;
+    public static float SMALL = 3.0f;
+    public static float MEDIUM = 4.0f;
+    public static float LARGE = 6.0f;
 
     /**
      * Creates a new randomly-shaped Rock object with the given diameter.
@@ -76,26 +80,18 @@ public class Rock extends OutlinedObject implements Renderable {
                 ind.put(3 * i + 2, i + 2); // Top right
             }
         }
-        this.polygon = new Polygon(vert, ind, false);
-
-        CircleShape shape = new CircleShape();
-        shape.m_radius = radius - MARGIN;
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyType.DYNAMIC;
-        this.body = Asteroids.world.createBody(bodyDef);
-        this.body.setLinearDamping(0.f);
-        Fixture fixture = this.body.createFixture(shape, DENSITY);
-        Filter filter = new Filter();
-        filter.categoryBits = TYPE;
-        filter.maskBits = MASK;
-        fixture.setFilterData(filter);
+        this.polygon = new Polygon(vert, ind);
+        this.body = Asteroids.getBody(radius - MARGIN, TYPE, MASK, DENSITY);
+        this.body.setUserData(this);
     }
 
     /**
      * Updates the rock (and wraps the transform).
+     * 
+     * @param delta
      */
     @Override
-    public void update() {
+    public void update(float delta) {
         Asteroids.wrapTransform(this.body);
     }
 
@@ -124,14 +120,46 @@ public class Rock extends OutlinedObject implements Renderable {
         }
         queue.add(this);
     }
+    
+    
+    @Override
+    public void dispatch(Collidable other) {
+        other.collide(this);
+    }
+
+    @Override
+    public void collide(Projectile other) {
+    }
+
+    @Override
+    public void collide(Rock other) {
+    }
+
+    @Override
+    public void collide(Starship other) {
+    }
+    
+    public void destroy() {
+        this.release();
+        if (this.radius == LARGE) {
+            for(int i = 0; i < 4; i++) {
+                Asteroids.add(getRock(MEDIUM, this.body.getPosition()));
+            }
+        } else if (this.radius == MEDIUM) {
+            for(int i = 0; i < 4; i++) {
+                Asteroids.add(getRock(SMALL, this.body.getPosition()));
+            }
+        }
+    }
 
     /**
      * Gets a rock of the given size, or creates one.
      *
      * @param radius
+     * @param position
      * @return
      */
-    public static Rock getRock(Float radius) {
+    public static Rock getRock(float radius, Vec2 position) {
         Queue<Rock> queue = released.get(radius);
         Rock rock;
         if (queue != null && queue.size() > 0) {
@@ -139,11 +167,26 @@ public class Rock extends OutlinedObject implements Renderable {
         } else {
             rock = new Rock(radius, 16);
         }
-        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
-        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
 
-        rock.body.setTransform(new Vec2(x, y), 0.f);
+        rock.body.setTransform(position, 0.f);
+        
+        float speed = (float) (Math.random() * (MAXSPEED - MINSPEED)) + MINSPEED;
+        float angle = (float) (2 * Math.PI * Math.random());
+        float dx = (float) (speed * Math.cos(angle));
+        float dy = (float) (speed * Math.sin(angle));
+        
+        rock.body.setLinearVelocity(new Vec2(dx, dy));
+        
         return rock;
     }
+    
+    public static Rock getRock(float radius) {
+        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
+        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
+        
+        return getRock(radius, new Vec2(x, y));
+    }
+    
     public static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
+
 }

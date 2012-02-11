@@ -27,9 +27,11 @@ public class OutlinedObject implements Renderable {
 
     /**
      * Updates the object (unused, no animation for this object type).
+     * 
+     * @param delta
      */
     @Override
-    public void update() {
+    public void update(float delta) {
     }
 
     /**
