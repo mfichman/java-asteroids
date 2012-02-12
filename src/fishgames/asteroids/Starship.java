@@ -32,12 +32,12 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     private Body body;
     private boolean flickerOn;
     private String weapon = "Photon";
-    private static float SCALE = .85f;
+    private static float SCALE = .90f;
     private static float THRUST = 1.5f;
     private static float SPIN = 4.f;
     private static float DENSITY = 1.f;
     public static int TYPE = 0x2;
-    public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE; // | Upgrade.TYPE
+    public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
     public Task flickerTask = new Task(0.07f) {
 
         @Override
@@ -69,7 +69,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     public Starship(Vector3f color) {
         this.fillColor = color;
         this.outlineColor = new Vector3f(1.f, 1.f, 1.f);
-        this.outlineScale = new Vector3f(1.12f, 1.12f, 1.12f);
+        this.outlineScale = new Vector3f(1.14f, 1.14f, 1.14f);
         // This is just fudged to make the outline look good.
 
         this.polygon = getHullPolygon();

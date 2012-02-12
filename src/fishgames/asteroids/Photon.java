@@ -5,6 +5,8 @@
  */
 package fishgames.asteroids;
 
+import java.util.LinkedList;
+import java.util.Queue;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import static org.lwjgl.opengl.GL11.glPopMatrix;
@@ -58,20 +60,6 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
     public float getDamage() {
         return 1.f;
     }
-         
-    public static Photon getProjectile() {
-        return new Photon();
-    }
-    
-    public static Polygon getBodyPolygon() {
-        if (bodyPolygon == null) {
-            bodyPolygon = Polygon.getSquare(SCALE);
-        }
-        return bodyPolygon;
-    }
-
-    
-    static Polygon bodyPolygon;
 
     @Override
     public void dispatch(Collidable other) {
@@ -84,10 +72,46 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
 
     @Override
     public void collide(Rock other) {
+        destroy();
     }
 
     @Override
     public void collide(Starship other) {
+        destroy();
     }
+    
+    public void destroy() {
+        release();
+    }
+    
+    public void release() {
+        if (this.body.isActive()) {
+            this.body.setActive(false);
+            Asteroids.remove(this);
+            released.add(this);
+        }
+    }
+         
+    public static Photon getProjectile() {
+        if (released.isEmpty()) {
+            return new Photon();
+        }
+        Photon photon = released.remove();
+        photon.body.setActive(true);
+        Asteroids.add(photon);
+        return photon;
+    }
+    
+    public static Polygon getBodyPolygon() {
+        if (bodyPolygon == null) {
+            bodyPolygon = Polygon.getSquare(SCALE);
+        }
+        return bodyPolygon;
+    }
+
+    
+    private static Polygon bodyPolygon;
+    private static Queue<Photon> released = new LinkedList<Photon>();
+
     
 }

@@ -7,10 +7,7 @@ package fishgames.asteroids;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.*;
 import org.lwjgl.BufferUtils;
@@ -21,20 +18,18 @@ import org.lwjgl.util.vector.Vector3f;
 /**
  * Procedurally-generated rock/asteroid constructed as a polygon, and modeled
  * physically as a circle.
- * 
+ *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Rock extends OutlinedObject implements Renderable, Collidable {
 
     private Body body;
     private float radius;
-    private static float MINSPEED = 2.0f;
-    private static float MAXSPEED = 6.0f;
     private static float DENSITY = 1.0f;
     private static float MARGIN = 0.05f; // Collision margin (to avoid gaps)
     public static int TYPE = 0x1;
     public static int MASK = Starship.TYPE | Projectile.TYPE;
-    public static float SMALL = 3.0f;
+    public static float SMALL = 2.0f;
     public static float MEDIUM = 4.0f;
     public static float LARGE = 6.0f;
 
@@ -44,9 +39,18 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
      * @param diameter size of the rock
      */
     public Rock(float radius, int segments) {
+        float scale;
+        if (radius == LARGE) {
+            scale = 1.03f;
+        } else if (radius == MEDIUM) {
+            scale = 1.05f;
+        } else {
+            scale = 1.09f;
+        }
+
         this.outlineColor = new Vector3f(.6f, .6f, .6f);
         this.fillColor = new Vector3f(.2f, .2f, .2f);
-        this.outlineScale = new Vector3f(1.02f, 1.02f, 1.02f);
+        this.outlineScale = new Vector3f(scale, scale, scale);
         // Fudged to make the outline look good.
 
         this.radius = radius;
@@ -87,7 +91,7 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
 
     /**
      * Updates the rock (and wraps the transform).
-     * 
+     *
      * @param delta
      */
     @Override
@@ -112,16 +116,18 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
      * Releases the rock and returns it to the pool of other rocks.
      */
     public void release() {
-        this.body.setActive(false);
-        Queue<Rock> queue = released.get(this.radius);
-        if (queue == null) {
-            queue = new LinkedList<Rock>();
-            released.put(this.radius, queue);
+        if (this.body.isActive()) {
+            this.body.setActive(false);
+            Asteroids.remove(this);
+            Queue<Rock> queue = released.get(this.radius);
+            if (queue == null) {
+                queue = new LinkedList<Rock>();
+                released.put(this.radius, queue);
+            }
+            queue.add(this);
         }
-        queue.add(this);
     }
-    
-    
+
     @Override
     public void dispatch(Collidable other) {
         other.collide(this);
@@ -129,6 +135,7 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
 
     @Override
     public void collide(Projectile other) {
+        destroy();
     }
 
     @Override
@@ -138,16 +145,27 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
     @Override
     public void collide(Starship other) {
     }
-    
+
     public void destroy() {
-        this.release();
-        if (this.radius == LARGE) {
-            for(int i = 0; i < 4; i++) {
-                Asteroids.add(getRock(MEDIUM, this.body.getPosition()));
+        if (this.body.isActive()) {
+            this.release();
+            int num = 0;
+            float size = 0.f;
+            if (this.radius == LARGE) {
+                size = MEDIUM;
+                num = Asteroids.random(2, 3);
+            } else if (this.radius == MEDIUM) {
+                size = SMALL;
+                num = Asteroids.random(2, 3);
             }
-        } else if (this.radius == MEDIUM) {
-            for(int i = 0; i < 4; i++) {
-                Asteroids.add(getRock(SMALL, this.body.getPosition()));
+
+            for (int i = 0; i < num; i++) {
+                getRock(size, this.body.getPosition());
+            }
+            if (this.radius == SMALL) {
+                for (int i = 0; i < 3; i++) {
+                    Debris.getDebris(this.body.getPosition());
+                }
             }
         }
     }
@@ -169,24 +187,38 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
         }
 
         rock.body.setTransform(position, 0.f);
-        
-        float speed = (float) (Math.random() * (MAXSPEED - MINSPEED)) + MINSPEED;
+        float minSpeed;
+        float maxSpeed;
+        if (radius == LARGE) {
+            minSpeed = 4.f;
+            maxSpeed = 6.f;
+        } else if (radius == MEDIUM) {
+            minSpeed = 6.f;
+            maxSpeed = 8.f;
+        } else {
+            minSpeed = 6.f;
+            maxSpeed = 9.f;
+        }
+
+        float speed = (float) (Math.random() * (maxSpeed - minSpeed)) + minSpeed;
         float angle = (float) (2 * Math.PI * Math.random());
         float dx = (float) (speed * Math.cos(angle));
         float dy = (float) (speed * Math.sin(angle));
-        
+
+        //rock.body.applyLinearImpulse(new Vec2(dx, dy), rock.body.getWorldCenter());
+
         rock.body.setLinearVelocity(new Vec2(dx, dy));
-        
+        rock.body.setActive(true);
+        Asteroids.add(rock);
+
         return rock;
     }
-    
+
     public static Rock getRock(float radius) {
         float x = (float) (Math.random() * Asteroids.getWorldSize().x);
         float y = (float) (Math.random() * Asteroids.getWorldSize().y);
-        
+
         return getRock(radius, new Vec2(x, y));
     }
-    
-    public static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
-
+    private static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
 }

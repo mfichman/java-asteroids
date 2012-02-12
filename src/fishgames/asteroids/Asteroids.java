@@ -4,10 +4,7 @@
  */
 package fishgames.asteroids;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
 import org.jbox2d.common.Vec2;
@@ -36,15 +33,28 @@ public class Asteroids {
     private static ArrayList<Renderable> working = new ArrayList<Renderable>();
     private static long accum = 0;
     private static long last = System.nanoTime();
-    private static float timestep = 1.f / 60.f;
+    private static float timestep = 1.f / 100.f;
     private static boolean renderablesDirty = false;
-
-
+    private static Random random = new Random();
+    
+    public static int random(int min, int max) {
+        return (Math.abs(random.nextInt()) % (max - min + 1)) + min;
+    }
+    
     /**
-     * @return the renderable objects
+     * 
+     * @param renderable 
      */
     public static void add(Renderable renderable) {
         renderables.add(renderable);
+        renderablesDirty = true;
+    }
+    
+    /*
+     * 
+     */
+    public static void remove(Renderable renderable) {
+        renderables.remove(renderable);
         renderablesDirty = true;
     }
     
@@ -175,7 +185,7 @@ public class Asteroids {
         // Update all objects and tasks in the task queue.
         accum += time - last;
         while (accum >= increment) {
-            world.step(timestep, 10, 10);
+            world.step(timestep, 8, 3);
             accum -= increment;
             for (Contact c = world.getContactList(); c != null; c = c.getNext()) {
                 Object a = c.getFixtureA().getBody().getUserData();
@@ -212,6 +222,8 @@ public class Asteroids {
         }
 
         Display.update();
+        Display.sync(50);
+        
         last = time;
     }
 
@@ -246,7 +258,7 @@ public class Asteroids {
         glScalef(10.f, 10.f, 10.f);
 
         for (int i = 0; i < 8; i++) {
-            add(Rock.getRock(6.f));
+            Rock.getRock(Rock.LARGE);
         }
         add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
         glEnable(GL_LINE_SMOOTH);

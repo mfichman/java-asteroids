@@ -44,14 +44,14 @@ public abstract class Task implements Comparable<Task> {
     /**
      * @return the deadline
      */
-    public float getDeadline() {
+    public long getDeadline() {
         return deadline;
     }
     
     /**
      */
     public void setDeadline() {
-        this.deadline = (long) (getTimeout() * 1000000000.f + System.nanoTime());
+        this.deadline = (long) (getTimeout() * 1000000000.) + System.nanoTime();
     }
     
     /**

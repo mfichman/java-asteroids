@@ -13,7 +13,7 @@ import org.jbox2d.common.Vec2;
  */
 public interface Projectile {
     
-    public static int TYPE = 0x3;
+    public static int TYPE = 0x4;
     public static int MASK = Starship.TYPE | Rock.TYPE;
     
     /**
