@@ -88,7 +88,6 @@ public class Debris extends OutlinedObject implements Renderable {
         this.fillColor.z = 0.2f * life / LIFE;
 
         life = Math.max(0.f, life - delta);
-                
         if (life <= 0.f) {
             release();
         }
@@ -119,15 +118,7 @@ public class Debris extends OutlinedObject implements Renderable {
     }
     
     public static Debris getDebris(Vec2 position) {
-        Debris debris;
-        if (released.isEmpty()) {
-            debris = new Debris();
-        } else {
-            debris = released.remove();
-        }
-        
-        debris.life = LIFE;
-        debris.body.setTransform(position, debris.body.getAngle());
+        Debris debris = released.isEmpty() ? new Debris() : released.remove(); 
         
         float minSpeed = 9.f;
         float maxSpeed = 12.f;
@@ -137,7 +128,9 @@ public class Debris extends OutlinedObject implements Renderable {
         float dy = (float) (speed * Math.sin(angle));
         
         debris.body.setLinearVelocity(new Vec2(dx, dy));
+        debris.body.setTransform(position, debris.body.getAngle());
         debris.body.setActive(true);
+        debris.life = LIFE;
         Asteroids.add(debris);
         
         return debris;

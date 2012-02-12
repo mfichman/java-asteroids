@@ -32,7 +32,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     private Body body;
     private boolean flickerOn;
     private String weapon = "Photon";
-    private static float SCALE = .90f;
+    private static float SCALE = .85f;
     private static float THRUST = 1.5f;
     private static float SPIN = 4.f;
     private static float DENSITY = 1.f;
@@ -80,7 +80,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         this.body = Asteroids.getBody(this.polygon, TYPE, MASK, DENSITY);
         this.body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
         this.body.setUserData(this);
-        
+
     }
 
     /**
@@ -144,25 +144,57 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             return;
         }
         try {
-            this.rearmTask.setActive(true);
             Vec2 launchVec = this.body.getWorldVector(new Vec2(0.f, -2.f));
             Class weaponClass = Class.forName("fishgames.asteroids." + this.weapon);
             Method weaponMethod = weaponClass.getMethod("getProjectile");
             Projectile projectile = (Projectile) weaponMethod.invoke(null);
             projectile.setPosition(this.body.getPosition().add(launchVec));
             projectile.setLaunchVector(launchVec, this.body.getLinearVelocity());
+            this.rearmTask.setTimeout(projectile.getRearmTime());
+            this.rearmTask.setActive(true);
         } catch (NoSuchMethodException ex) {
-            ex.printStackTrace();
         } catch (SecurityException ex) {
-            ex.printStackTrace();
         } catch (ClassNotFoundException ex) {
-            ex.printStackTrace();
         } catch (IllegalAccessException ex) {
-            ex.printStackTrace();
         } catch (IllegalArgumentException ex) {
-            ex.printStackTrace();
         } catch (InvocationTargetException ex) {
-            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void dispatch(Collidable other) {
+        other.collide(this);
+    }
+
+    @Override
+    public void collide(Projectile other) {
+    }
+
+    @Override
+    public void collide(Rock other) {
+        destroy();
+
+    }
+
+    @Override
+    public void collide(Starship other) {
+        
+    }
+    Explosion ex;
+    
+    public void destroy() {
+        if (this.ex == null || !this.ex.getBody().isActive()) {
+            ex = Explosion.getExplosion(3.f, this.body.getPosition());
+            ex.getColor().x = 1.f;
+            ex.getColor().y = .85f;
+            ex.getColor().z = .2f;
+            //Asteroids.remove(this);
+            //this.body.setActive(false);
+            /*
+            ex = Explosion.getExplosion(4.2f, this.body.getPosition());
+            ex.getColor().x = 1.f;
+            ex.getColor().y = .0f;
+            ex.getColor().z = .0f;*/
         }
     }
 
@@ -239,24 +271,6 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         }
         return mainThrusterPolygon;
     }
-    
     static Polygon hullPolygon;
     static Polygon mainThrusterPolygon;
-
-    @Override
-    public void dispatch(Collidable other) {
-        other.collide(this);
-    }
-
-    @Override
-    public void collide(Projectile other) {
-    }
-
-    @Override
-    public void collide(Rock other) { 
-    }
-
-    @Override
-    public void collide(Starship other) {
-    }
 }

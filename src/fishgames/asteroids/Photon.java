@@ -18,25 +18,32 @@ import org.lwjgl.util.vector.Vector3f;
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Photon extends OutlinedObject implements Projectile, Renderable, Collidable {
-    
+
     private Body body;
     private static float SCALE = .2f;
     private static float SPEED = 40.f;
-    
+    private static float LIFE = 1.8f;
+    public float life;
+
     public Photon() {
-        this.polygon = getBodyPolygon();
+        this.polygon = getPolygon();
         this.body = Asteroids.getBody(this.polygon, TYPE, MASK, SCALE);
         this.body.setBullet(true);
         this.body.setUserData(this);
         this.fillColor = new Vector3f(1.f, 1.f, 1.f);
+        this.life = LIFE;
         Asteroids.add(this);
     }
 
     @Override
-    public void update(float delta) {        
+    public void update(float delta) {
         Asteroids.wrapTransform(this.body);
+        life = Math.max(0.f, life - delta);
+        if (life <= 0.f) {
+            destroy();
+        }
     }
-    
+
     @Override
     public void render(float alpha) {
         glPushMatrix();
@@ -62,6 +69,11 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
     }
 
     @Override
+    public float getRearmTime() {
+        return .1f;
+    }
+
+    @Override
     public void dispatch(Collidable other) {
         other.collide(this);
     }
@@ -79,11 +91,17 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
     public void collide(Starship other) {
         destroy();
     }
-    
+
     public void destroy() {
-        release();
+        if (this.body.isActive()) {
+            release();
+            Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
+            ex.getColor().x = 1.f;
+            ex.getColor().y = .85f;
+            ex.getColor().z = .2f;
+        }
     }
-    
+
     public void release() {
         if (this.body.isActive()) {
             this.body.setActive(false);
@@ -91,27 +109,21 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
             released.add(this);
         }
     }
-         
+
     public static Photon getProjectile() {
-        if (released.isEmpty()) {
-            return new Photon();
-        }
-        Photon photon = released.remove();
+        Photon photon = released.isEmpty() ? new Photon() : released.remove();
         photon.body.setActive(true);
+        photon.life = LIFE;
         Asteroids.add(photon);
         return photon;
     }
-    
-    public static Polygon getBodyPolygon() {
+
+    public static Polygon getPolygon() {
         if (bodyPolygon == null) {
             bodyPolygon = Polygon.getSquare(SCALE);
         }
         return bodyPolygon;
     }
-
-    
     private static Polygon bodyPolygon;
     private static Queue<Photon> released = new LinkedList<Photon>();
-
-    
 }

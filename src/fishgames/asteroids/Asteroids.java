@@ -110,7 +110,7 @@ public class Asteroids {
     public static Body getBody(Polygon polygon, int type, int mask, float density) {
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.DYNAMIC;
-        Body body = Asteroids.world.createBody(bodyDef);
+        Body body = Asteroids.getWorld().createBody(bodyDef);
         if (polygon.getShapes() != null) {
             for (Shape shape : polygon.getShapes()) {
                 Fixture fixture = body.createFixture(shape, density);
@@ -132,7 +132,7 @@ public class Asteroids {
         shape.m_radius = radius;
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.DYNAMIC;
-        Body body = Asteroids.world.createBody(bodyDef);
+        Body body = Asteroids.getWorld().createBody(bodyDef);
         Fixture fixture = body.createFixture(shape, density);
         Filter filter = new Filter();
         filter.categoryBits = type;
@@ -185,9 +185,9 @@ public class Asteroids {
         // Update all objects and tasks in the task queue.
         accum += time - last;
         while (accum >= increment) {
-            world.step(timestep, 8, 3);
+            getWorld().step(timestep, 8, 3);
             accum -= increment;
-            for (Contact c = world.getContactList(); c != null; c = c.getNext()) {
+            for (Contact c = getWorld().getContactList(); c != null; c = c.getNext()) {
                 Object a = c.getFixtureA().getBody().getUserData();
                 Object b = c.getFixtureB().getBody().getUserData();
                 if (a != null && b != null && c.isTouching()) {
@@ -268,5 +268,12 @@ public class Asteroids {
             update();
         }
         Display.destroy();
+    }
+
+    /**
+     * @return the world
+     */
+    public static World getWorld() {
+        return world;
     }
 }

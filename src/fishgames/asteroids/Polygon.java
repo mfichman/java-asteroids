@@ -9,10 +9,11 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.PolygonShape;
+import org.jbox2d.collision.shapes.Shape;
 import org.jbox2d.common.Vec2;
 import org.lwjgl.BufferUtils;
-import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 /**
@@ -21,7 +22,7 @@ import static org.lwjgl.opengl.GL15.*;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Polygon implements Renderable {
+public class Polygon {
 
     /**
      * Vertex buffer object handle.
@@ -38,7 +39,7 @@ public class Polygon implements Renderable {
     /**
      * Polygon shape for Box2D
      */
-    private ArrayList<PolygonShape> shape;
+    private ArrayList<Shape> shape;
 
     public Polygon(FloatBuffer vert, IntBuffer ind) {
         IntBuffer intBuf = BufferUtils.createIntBuffer(2);
@@ -62,9 +63,9 @@ public class Polygon implements Renderable {
      *
      * @param shape
      */
-    public void addShape(PolygonShape shape) {
+    public void addShape(Shape shape) {
         if (this.shape == null) {
-            this.shape = new ArrayList<PolygonShape>();
+            this.shape = new ArrayList<Shape>();
         }
         this.shape.add(shape);
     }
@@ -75,33 +76,8 @@ public class Polygon implements Renderable {
      *
      * @return
      */
-    public List<PolygonShape> getShapes() {
+    public List<Shape> getShapes() {
         return this.shape;
-    }
-
-    /**
-     * Updates this object. Unused; no animation.
-     *
-     * @param delta
-     */
-    @Override
-    public void update(float delta) {
-    }
-
-    /**
-     * Renders this object with interpolation constant alpha.
-     *
-     * @param alpha
-     */
-    @Override
-    public void render(float alpha) {
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glBindBuffer(GL_ARRAY_BUFFER, this.vertices);
-        glVertexPointer(2, GL_FLOAT, 0, 0);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.indices);
-        glDrawElements(GL_TRIANGLES, this.numElements, GL_UNSIGNED_INT, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
     /**
@@ -110,8 +86,8 @@ public class Polygon implements Renderable {
      */
     public void release() {
         IntBuffer buf = BufferUtils.createIntBuffer(2);
-        buf.put(0, this.vertices);
-        buf.put(0, this.indices);
+        buf.put(0, this.getVertices());
+        buf.put(0, this.getIndices());
         glDeleteBuffers(buf);
         this.vertices = 0;
         this.indices = 0;
@@ -131,8 +107,6 @@ public class Polygon implements Renderable {
         
         vert.put(6, -size); // Lower left
         vert.put(7, size);
-
-        System.out.printf("%f\n", size);
         
         IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
         ind.put(0, 0); // Right side
@@ -159,5 +133,26 @@ public class Polygon implements Renderable {
         shape2.set(triangle2, triangle2.length);
         polygon.addShape(shape2);
         return polygon;
+    }
+
+    /**
+     * @return the vertices
+     */
+    public int getVertices() {
+        return vertices;
+    }
+
+    /**
+     * @return the indices
+     */
+    public int getIndices() {
+        return indices;
+    }
+
+    /**
+     * @return the numElements
+     */
+    public int getNumElements() {
+        return numElements;
     }
 }

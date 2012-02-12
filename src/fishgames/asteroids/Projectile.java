@@ -20,16 +20,21 @@ public interface Projectile {
      * Sets the launch vector and also activates the projectile.
      * @param direction 
      */
-    public abstract void setLaunchVector(Vec2 direction, Vec2 velocity);
+    public void setLaunchVector(Vec2 direction, Vec2 velocity);
   
     /**
      * Sets the position of the projectile
      * @param position 
      */
-    public abstract void setPosition(Vec2 position);
+    public void setPosition(Vec2 position);
     
     /**
      * Returns the damage inflicted by this projectile.
      */
-    public abstract float getDamage(); 
+    public float getDamage(); 
+    
+    /**
+     * Returns the reload time.
+     */
+    public float getRearmTime();
 }

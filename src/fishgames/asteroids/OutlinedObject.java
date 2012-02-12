@@ -6,6 +6,7 @@
 package fishgames.asteroids;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL15.*;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
@@ -48,22 +49,28 @@ public class OutlinedObject implements Renderable {
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
 
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.polygon.getIndices());
+        glBindBuffer(GL_ARRAY_BUFFER, this.polygon.getVertices());
+        glVertexPointer(2, GL_FLOAT, 0, 0);
+        
         if (this.outlineColor != null) {
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(-20f, -20f);
             glPushMatrix();
             glScalef(this.outlineScale.x, this.outlineScale.y, this.outlineScale.z);
             glColor4f(this.outlineColor.x, this.outlineColor.y, this.outlineColor.z, this.alpha);
-            this.polygon.render(alpha);
+            glDrawElements(GL_TRIANGLES, this.polygon.getNumElements(), GL_UNSIGNED_INT, 0);
             glPopMatrix();
             glDisable(GL_POLYGON_OFFSET_FILL);
-
         }
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glColor4f(this.fillColor.x, this.fillColor.y, this.fillColor.z, this.alpha);
-        this.polygon.render(alpha);
-
+        glDrawElements(GL_TRIANGLES, this.polygon.getNumElements(), GL_UNSIGNED_INT, 0);
+        
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         if (this.alpha != 1.0f) {
             glDisable(GL_BLEND);
