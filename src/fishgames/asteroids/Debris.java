@@ -35,7 +35,6 @@ public class Debris extends OutlinedObject implements Renderable {
     public Debris() {
         this.outlineColor = new Vector3f(.8f, .8f, .8f);
         this.fillColor = new Vector3f(.2f, .2f, .2f);
-        this.outlineScale = new Vector3f(1.12f, 1.12f, 1.12f);
         this.life = LIFE;
         
         int segments = 12;
@@ -49,9 +48,8 @@ public class Debris extends OutlinedObject implements Renderable {
             // Skew the angle and diameter by up to 10% in either direction.
             // This is a bit of a 'magic' equation to make the rocks look right.
             double diameterSkew = (Math.random() - 0.5) * radius * 0.3;
-            double angleSkew = 0; //(Math.random() - 0.5) * angle;
-            double px = (diameterSkew + radius) * Math.cos(angleSkew + angle * i);
-            double py = (diameterSkew + radius) * Math.sin(angleSkew + angle * i);
+            double px = (diameterSkew + radius) * Math.cos(angle * i);
+            double py = (diameterSkew + radius) * Math.sin(angle * i);
             vert.put((i + 1) * 2 + 0, (float) px);
             vert.put((i + 1) * 2 + 1, (float) py);
 
@@ -82,15 +80,11 @@ public class Debris extends OutlinedObject implements Renderable {
     @Override
     public void update(float delta) {
         Asteroids.wrapTransform(this.body);
-        this.alpha = life / LIFE;
-        this.fillColor.x = 0.2f * life / LIFE;
-        this.fillColor.y = 0.2f * life / LIFE;
-        this.fillColor.z = 0.2f * life / LIFE;
-
-        life = Math.max(0.f, life - delta);
-        if (life <= 0.f) {
+        this.life = Math.max(0.f, this.life - delta);
+        if (this.life <= 0.f) {
             release();
         }
+        this.alpha = life / LIFE;
     }
     
     /**

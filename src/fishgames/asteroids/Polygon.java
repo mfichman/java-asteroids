@@ -32,29 +32,31 @@ public class Polygon {
      * Index buffer object handle.
      */
     private int indices;
-    /**
-     * Number of triangles
-     */
-    private int numElements;
+    private int numVertices;
+    private int numIndices;
     /**
      * Polygon shape for Box2D
      */
     private ArrayList<Shape> shape;
 
     public Polygon(FloatBuffer vert, IntBuffer ind) {
-        IntBuffer intBuf = BufferUtils.createIntBuffer(2);
+        IntBuffer intBuf = BufferUtils.createIntBuffer(1);
         glGenBuffers(intBuf);
-        this.vertices = intBuf.get(0);
-        this.indices = intBuf.get(1);
 
+        this.vertices = intBuf.get(0);
+        this.numVertices = vert.limit() / 2;
         glBindBuffer(GL_ARRAY_BUFFER, this.vertices);
         glBufferData(GL_ARRAY_BUFFER, vert, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.indices);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind, GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        this.numElements = ind.limit();
+        if (ind != null) {
+            glGenBuffers(intBuf);
+            this.indices = intBuf.get(0);
+            this.numIndices = ind.limit();
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.indices);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind, GL_STATIC_DRAW);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        }
     }
 
     /**
@@ -87,36 +89,46 @@ public class Polygon {
     public void release() {
         IntBuffer buf = BufferUtils.createIntBuffer(2);
         buf.put(0, this.getVertices());
-        buf.put(0, this.getIndices());
+        buf.put(1, this.getIndices());
         glDeleteBuffers(buf);
         this.vertices = 0;
         this.indices = 0;
     }
-    
+
+    public static Polygon getCircle(float radius, int segments) {
+        // Create one vertex per segment.  Each vertex has 2 coordinates.
+        FloatBuffer vert = BufferUtils.createFloatBuffer(2 * segments);
+        double angle = 2. * Math.PI / segments;
+        for (int i = 0; i < segments; i++) {
+            double px = (radius) * Math.cos(angle * i);
+            double py = (radius) * Math.sin(angle * i);
+            vert.put(i * 2 + 0, (float) px);
+            vert.put(i * 2 + 1, (float) py);
+        }
+
+        CircleShape shape = new CircleShape();
+        shape.m_radius = radius;
+        Polygon polygon = new Polygon(vert, null);
+        polygon.addShape(shape);
+        return polygon;
+    }
+
     public static Polygon getSquare(float size) {
         FloatBuffer vert = BufferUtils.createFloatBuffer(8);
-        
+
         vert.put(0, size); // Upper left
         vert.put(1, size);
-        
+
         vert.put(2, size); // Upper right
         vert.put(3, -size);
 
         vert.put(4, -size); // Lower right
         vert.put(5, -size);
-        
+
         vert.put(6, -size); // Lower left
         vert.put(7, size);
-        
-        IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
-        ind.put(0, 0); // Right side
-        ind.put(1, 1);
-        ind.put(2, 2);
-        ind.put(3, 0); // Left side
-        ind.put(4, 3);
-        ind.put(5, 2);
 
-        Polygon polygon = new Polygon(vert, ind);
+        Polygon polygon = new Polygon(vert, null);
         Vec2[] triangle1 = new Vec2[3];
         triangle1[0] = new Vec2(vert.get(0), vert.get(1));
         triangle1[1] = new Vec2(vert.get(2), vert.get(3));
@@ -143,7 +155,7 @@ public class Polygon {
     }
 
     /**
-     * @return the indices
+     * @return the vertices
      */
     public int getIndices() {
         return indices;
@@ -152,7 +164,11 @@ public class Polygon {
     /**
      * @return the numElements
      */
-    public int getNumElements() {
-        return numElements;
+    public int getNumIndices() {
+        return numIndices;
+    }
+
+    public int getNumVertices() {
+        return numVertices;
     }
 }

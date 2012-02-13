@@ -24,7 +24,6 @@ public class OutlinedObject implements Renderable {
     protected Polygon polygon;
     protected Vector3f fillColor;
     protected Vector3f outlineColor;
-    protected Vector3f outlineScale;
     protected float alpha = 1.0f;
 
     /**
@@ -50,30 +49,47 @@ public class OutlinedObject implements Renderable {
         }
 
         glEnableClientState(GL_VERTEX_ARRAY);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.polygon.getIndices());
         glBindBuffer(GL_ARRAY_BUFFER, this.polygon.getVertices());
         glVertexPointer(2, GL_FLOAT, 0, 0);
-        
-        if (this.outlineColor != null) {
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(-20f, -20f);
-            glPushMatrix();
-            glScalef(this.outlineScale.x, this.outlineScale.y, this.outlineScale.z);
-            glColor4f(this.outlineColor.x, this.outlineColor.y, this.outlineColor.z, this.alpha);
-            glDrawElements(GL_TRIANGLES, this.polygon.getNumElements(), GL_UNSIGNED_INT, 0);
-            glPopMatrix();
-            glDisable(GL_POLYGON_OFFSET_FILL);
+        if (this.getFillColor() != null) {
+            glColor4f(this.getFillColor().x, this.getFillColor().y, this.getFillColor().z, this.alpha);
+            if (this.polygon.getNumIndices() > 0) {
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.polygon.getIndices());
+                glDrawElements(GL_TRIANGLES, this.polygon.getNumIndices() * 1000, GL_UNSIGNED_INT, 0);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            } else {
+                glDrawArrays(GL_POLYGON, 0, this.polygon.getNumVertices());
+            }
         }
 
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glColor4f(this.fillColor.x, this.fillColor.y, this.fillColor.z, this.alpha);
-        glDrawElements(GL_TRIANGLES, this.polygon.getNumElements(), GL_UNSIGNED_INT, 0);
-        
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        if (this.getOutlineColor() != null) {
+            glLineWidth(1.5f);
+            glColor4f(this.getOutlineColor().x, this.getOutlineColor().y, this.getOutlineColor().z, this.alpha);
+            if (this.polygon.getNumIndices() > 0) {
+                glDrawArrays(GL_LINE_LOOP, 1, this.polygon.getNumVertices()-1);
+            } else {
+                glDrawArrays(GL_LINE_LOOP, 0, this.polygon.getNumVertices());
+            }
+        }
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDisableClientState(GL_VERTEX_ARRAY);
 
         if (this.alpha != 1.0f) {
             glDisable(GL_BLEND);
         }
+    }
+
+    /**
+     * @return the fillColor
+     */
+    public Vector3f getFillColor() {
+        return fillColor;
+    }
+
+    /**
+     * @return the outlineColor
+     */
+    public Vector3f getOutlineColor() {
+        return outlineColor;
     }
 }

@@ -29,13 +29,16 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     private OutlinedObject mainThruster = new OutlinedObject();
     private OutlinedObject leftThruster = new OutlinedObject();
     private OutlinedObject rightThruster = new OutlinedObject();
+    private OutlinedObject shield = new OutlinedObject();
     private Body body;
     private boolean flickerOn;
+    private float shieldLife;
     private String weapon = "Photon";
     private static float SCALE = .85f;
     private static float THRUST = 1.5f;
     private static float SPIN = 4.f;
     private static float DENSITY = 1.f;
+    private static float SHIELD_LIFE = 0.2f;
     public static int TYPE = 0x2;
     public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
     public Task flickerTask = new Task(0.07f) {
@@ -69,8 +72,6 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     public Starship(Vector3f color) {
         this.fillColor = color;
         this.outlineColor = new Vector3f(1.f, 1.f, 1.f);
-        this.outlineScale = new Vector3f(1.14f, 1.14f, 1.14f);
-        // This is just fudged to make the outline look good.
 
         this.polygon = getHullPolygon();
 
@@ -80,7 +81,11 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         this.body = Asteroids.getBody(this.polygon, TYPE, MASK, DENSITY);
         this.body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
         this.body.setUserData(this);
-
+        
+        this.shield.polygon = getShieldPolygon();
+        this.shield.fillColor = new Vector3f(0.2f, 0.2f, 1.f);
+        this.shield.outlineColor = new Vector3f(0.4f, 0.4f, 1.f);
+        this.shield.alpha = .7f;
     }
 
     /**
@@ -90,6 +95,8 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
      */
     @Override
     public void update(float delta) {
+        this.shieldLife = Math.max(0.f, this.shieldLife - delta);
+        
         Vec2 forward = this.body.getWorldVector(new Vec2(0.f, THRUST));
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
             this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
@@ -127,6 +134,10 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
                 this.mainThruster.render(alpha);
             }
+            if (this.shieldLife > 0.f) {
+                this.shield.alpha = this.shieldLife / SHIELD_LIFE * 0.5f;
+                this.shield.render(alpha);
+            }
             glPopMatrix();
         }
     }
@@ -144,7 +155,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             return;
         }
         try {
-            Vec2 launchVec = this.body.getWorldVector(new Vec2(0.f, -2.f));
+            Vec2 launchVec = this.body.getWorldVector(new Vec2(0.f, -2.2f));
             Class weaponClass = Class.forName("fishgames.asteroids." + this.weapon);
             Method weaponMethod = weaponClass.getMethod("getProjectile");
             Projectile projectile = (Projectile) weaponMethod.invoke(null);
@@ -160,6 +171,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         } catch (InvocationTargetException ex) {
         }
     }
+    
 
     @Override
     public void dispatch(Collidable other) {
@@ -168,26 +180,27 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
 
     @Override
     public void collide(Projectile other) {
+        this.shieldLife = SHIELD_LIFE;
     }
 
     @Override
     public void collide(Rock other) {
-        destroy();
-
+        //destroy();
+        this.shieldLife = SHIELD_LIFE;
     }
 
     @Override
     public void collide(Starship other) {
-        
+        this.shieldLife = SHIELD_LIFE;
     }
     Explosion ex;
     
     public void destroy() {
         if (this.ex == null || !this.ex.getBody().isActive()) {
             ex = Explosion.getExplosion(3.f, this.body.getPosition());
-            ex.getColor().x = 1.f;
-            ex.getColor().y = .85f;
-            ex.getColor().z = .2f;
+            ex.getFillColor().x = 1.f;
+            ex.getFillColor().y = .85f;
+            ex.getFillColor().z = .2f;
             //Asteroids.remove(this);
             //this.body.setActive(false);
             /*
@@ -205,23 +218,30 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
      */
     static Polygon getHullPolygon() {
         if (hullPolygon == null) {
-            FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 4);
-            vert.put(0, SCALE * 0.f); // Aft # 0
-            vert.put(1, SCALE * 1.f);
-            vert.put(2, SCALE * -1.8f); // Right wing # 1
-            vert.put(3, SCALE * 2.f);
-            vert.put(4, SCALE * 0.f); // Bow # 2
-            vert.put(5, SCALE * -2.f);
-            vert.put(6, SCALE * 1.8f); // Left wing # 3
-            vert.put(7, SCALE * 2.f);
-
+            FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 5);
+            vert.put(0, 0); 
+            vert.put(1, 0);
+            // These zeros is here because an offset of 1 is added to account
+            // for the 'center' point needed for most polygons in the game, 
+            // which is skipped in line-rendering mode.
+            
+            vert.put(2, SCALE * 0.f); // Aft # 0
+            vert.put(3, SCALE * .8f);
+            vert.put(4, SCALE * -1.8f); // Right wing # 1
+            vert.put(5, SCALE * 1.8f);
+            vert.put(6, SCALE * 0.f); // Bow # 2
+            vert.put(7, SCALE * -2.2f);
+            vert.put(8, SCALE * 1.8f); // Left wing # 3
+            vert.put(9, SCALE * 1.8f);
+            
             IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
-            ind.put(0, 0); // Right side
-            ind.put(1, 1);
-            ind.put(2, 2);
-            ind.put(3, 0); // Left side
-            ind.put(4, 2);
-            ind.put(5, 3);
+            ind.put(0, 1);
+            ind.put(1, 2);
+            ind.put(2, 3);
+            ind.put(3, 1);
+            ind.put(4, 3);
+            ind.put(5, 4);
+            
             hullPolygon = new Polygon(vert, ind);
 
             Vec2[] triangle1 = new Vec2[3];
@@ -252,25 +272,26 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         if (mainThrusterPolygon == null) {
             FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 4);
             vert.put(0, SCALE * 0.f); // Top
-            vert.put(1, SCALE * 1.3f);
+            vert.put(1, SCALE * 1.1f);
             vert.put(2, SCALE * -0.8f); // Left
-            vert.put(3, SCALE * 1.8f);
-            vert.put(4, SCALE * 0.f); // Right
-            vert.put(5, SCALE * 3.2f);
-            vert.put(6, SCALE * .8f); // Bottom
-            vert.put(7, SCALE * 1.8f);
-
-            IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
-            ind.put(0, 0); // Right side
-            ind.put(1, 1);
-            ind.put(2, 2);
-            ind.put(3, 0); // Left side
-            ind.put(4, 3);
-            ind.put(5, 2);
-            mainThrusterPolygon = new Polygon(vert, ind);
+            vert.put(3, SCALE * 1.6f);
+            vert.put(4, SCALE * 0.f); // Bottom
+            vert.put(5, SCALE * 3.0f);
+            vert.put(6, SCALE * .8f); // Right
+            vert.put(7, SCALE * 1.6f); 
+            mainThrusterPolygon = new Polygon(vert, null);
         }
         return mainThrusterPolygon;
     }
+    
+    static Polygon getShieldPolygon() {
+        if (shieldPolygon == null) {
+            shieldPolygon = Polygon.getCircle(3.5f, 32);
+        }
+        return shieldPolygon;
+    }
+    
     static Polygon hullPolygon;
     static Polygon mainThrusterPolygon;
+    static Polygon shieldPolygon;
 }

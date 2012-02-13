@@ -39,20 +39,8 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
      * @param diameter size of the rock
      */
     public Rock(float radius, int segments) {
-        float scale;
-        if (radius == LARGE) {
-            scale = 1.03f;
-        } else if (radius == MEDIUM) {
-            scale = 1.05f;
-        } else {
-            scale = 1.09f;
-        }
-
         this.outlineColor = new Vector3f(.6f, .6f, .6f);
         this.fillColor = new Vector3f(.2f, .2f, .2f);
-        this.outlineScale = new Vector3f(scale, scale, scale);
-        // Fudged to make the outline look good.
-
         this.radius = radius;
 
         // Create one vertex per segment.  Each vertex has 2 coordinates.
@@ -63,9 +51,8 @@ public class Rock extends OutlinedObject implements Renderable, Collidable {
             // Skew the angle and diameter by up to 10% in either direction.
             // This is a bit of a 'magic' equation to make the rocks look right.
             double diameterSkew = (Math.random() - 0.5) * radius * 0.3;
-            double angleSkew = 0; //(Math.random() - 0.5) * angle;
-            double px = (diameterSkew + radius) * Math.cos(angleSkew + angle * i);
-            double py = (diameterSkew + radius) * Math.sin(angleSkew + angle * i);
+            double px = (diameterSkew + radius) * Math.cos(angle * i);
+            double py = (diameterSkew + radius) * Math.sin(angle * i);
             vert.put((i + 1) * 2 + 0, (float) px);
             vert.put((i + 1) * 2 + 1, (float) py);
 

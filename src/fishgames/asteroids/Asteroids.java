@@ -4,6 +4,10 @@
  */
 package fishgames.asteroids;
 
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.io.IOException;
+import java.net.URL;
 import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
@@ -19,6 +23,8 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Vector3f;
+import org.newdawn.slick.Color;
+import org.newdawn.slick.TrueTypeFont;
 
 /**
  * Big huge static class to hold all the game-specific info, like world size,
@@ -181,6 +187,8 @@ public class Asteroids {
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glLoadIdentity();
+        glScalef(10.f, 10.f, 10.f);
 
         // Update all objects and tasks in the task queue.
         accum += time - last;
@@ -220,18 +228,31 @@ public class Asteroids {
         for (Renderable object : working) {
             object.render(interp);
         }
+        
+        
+        glLoadIdentity(); 
+       //Color.white.bind();
+        glEnable(GL_BLEND);
+        glEnable(GL_TEXTURE_2D);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        font.drawString(20, 300, "extreme asteroids", Color.white);
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_BLEND);
 
         Display.update();
         Display.sync(50);
         
+        
         last = time;
     }
-
+    
+    static TrueTypeFont font;
+    
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) throws LWJGLException {
-        // TODO code application logic here 
+    public static void main(String[] args) throws LWJGLException, IOException, FontFormatException {
+        // TODO code application logic here
         int width = (int) (getWorldSize().x * 10);
         int height = (int) (getWorldSize().y * 10);
         DisplayMode mode = new DisplayMode(width, height);
@@ -246,7 +267,7 @@ public class Asteroids {
 
         Keyboard.create();
         Mouse.create();
-
+        
         glClearColor(0.0f, 0, 0, 1.0f);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_LIGHTING);
@@ -255,7 +276,6 @@ public class Asteroids {
         glLoadIdentity();
         glOrtho(0, mode.getWidth(), mode.getHeight(), 0.f, -1.f, 1.f);
         glMatrixMode(GL_MODELVIEW);
-        glScalef(10.f, 10.f, 10.f);
 
         for (int i = 0; i < 8; i++) {
             Rock.getRock(Rock.LARGE);
@@ -263,6 +283,11 @@ public class Asteroids {
         add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
         glEnable(GL_LINE_SMOOTH);
         glEnable(GL_MULTISAMPLE);
+      
+        URL url = Asteroids.class.getResource("/fishgames/asteroids/fonts/Russel.ttf");
+        Font awtFont = Font.createFont(Font.TRUETYPE_FONT, url.openStream());
+        awtFont = awtFont.deriveFont(Font.PLAIN, 60.f);
+        font = new TrueTypeFont(awtFont, true);
 
         while (!Display.isCloseRequested()) {
             update();

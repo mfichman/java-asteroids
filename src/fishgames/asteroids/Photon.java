@@ -96,9 +96,9 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
         if (this.body.isActive()) {
             release();
             Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
-            ex.getColor().x = 1.f;
-            ex.getColor().y = .85f;
-            ex.getColor().z = .2f;
+            ex.getFillColor().x = 1.f;
+            ex.getFillColor().y = .85f;
+            ex.getFillColor().z = .2f;
         }
     }
 
