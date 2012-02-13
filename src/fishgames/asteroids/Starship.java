@@ -35,10 +35,11 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     private float shieldLife;
     private String weapon = "Photon";
     private static float SCALE = .85f;
-    private static float THRUST = 1.5f;
+    private static float MAXSPEED = 30.f;
     private static float SPIN = 4.f;
     private static float DENSITY = 1.f;
     private static float SHIELD_LIFE = 0.2f;
+    private static Vec2 THRUST = new Vec2(0, 1.0f);
     public static int TYPE = 0x2;
     public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
     public Task flickerTask = new Task(0.07f) {
@@ -81,6 +82,7 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         this.body = Asteroids.getBody(this.polygon, TYPE, MASK, DENSITY);
         this.body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
         this.body.setUserData(this);
+        this.body.setLinearDamping(.4f);
         
         this.shield.polygon = getShieldPolygon();
         this.shield.fillColor = new Vector3f(0.2f, 0.2f, 1.f);
@@ -97,7 +99,14 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     public void update(float delta) {
         this.shieldLife = Math.max(0.f, this.shieldLife - delta);
         
-        Vec2 forward = this.body.getWorldVector(new Vec2(0.f, THRUST));
+        float speed = this.body.getLinearVelocity().length();
+        float capped = Math.min(speed, MAXSPEED);
+        if (speed > 0) {
+            this.body.getLinearVelocity().x *= capped / speed;
+            this.body.getLinearVelocity().y *= capped / speed;
+        }
+        
+        Vec2 forward = this.body.getWorldVector(THRUST);
         if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
             this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
         }
