@@ -27,8 +27,6 @@ import org.lwjgl.util.vector.Vector3f;
 public class Starship extends OutlinedObject implements Renderable, Collidable {
 
     private OutlinedObject mainThruster = new OutlinedObject();
-    private OutlinedObject leftThruster = new OutlinedObject();
-    private OutlinedObject rightThruster = new OutlinedObject();
     private OutlinedObject shield = new OutlinedObject();
     private Body body;
     private boolean flickerOn;
@@ -283,11 +281,11 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             vert.put(0, SCALE * 0.f); // Top
             vert.put(1, SCALE * 1.1f);
             vert.put(2, SCALE * -0.8f); // Left
-            vert.put(3, SCALE * 1.6f);
+            vert.put(3, SCALE * 1.7f);
             vert.put(4, SCALE * 0.f); // Bottom
             vert.put(5, SCALE * 3.0f);
             vert.put(6, SCALE * .8f); // Right
-            vert.put(7, SCALE * 1.6f); 
+            vert.put(7, SCALE * 1.7f); 
             mainThrusterPolygon = new Polygon(vert, null);
         }
         return mainThrusterPolygon;
@@ -296,6 +294,34 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
     static Polygon getShieldPolygon() {
         if (shieldPolygon == null) {
             shieldPolygon = Polygon.getCircle(3.5f, 32);
+            /*
+            float scale = 1.4f;
+            
+            FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 5);
+            vert.put(0, 0); 
+            vert.put(1, 0);
+            // These zeros is here because an offset of 1 is added to account
+            // for the 'center' point needed for most polygons in the game, 
+            // which is skipped in line-rendering mode.
+            vert.put(2, scale * 0.f); // Aft # 0
+            vert.put(3, scale * 1.2f);
+            vert.put(4, scale * -1.6f); // Right wing # 1
+            vert.put(5, scale * 1.5f);
+            vert.put(6, scale * 0.f); // Bow # 2
+            vert.put(7, scale * -2.2f);
+            vert.put(8, scale * 1.6f); // Left wing # 3
+            vert.put(9, scale * 1.5f);
+            
+            
+            IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
+            ind.put(0, 1);
+            ind.put(1, 2);
+            ind.put(2, 3);
+            ind.put(3, 1);
+            ind.put(4, 3);
+            ind.put(5, 4);
+            
+            shieldPolygon = new Polygon(vert, ind);*/
         }
         return shieldPolygon;
     }
