@@ -6,12 +6,10 @@
 package fishgames.asteroids;
 
 /**
- * Simple interface for a renderable object.
- * 
+ *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public interface Renderable {
-    
-    public void render(float alpha);
+public interface Object {
+    public void dispatch(Functor func);
     public void update(float delta);
 }

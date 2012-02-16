@@ -9,28 +9,24 @@ import java.util.LinkedList;
 import java.util.Queue;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
-import static org.lwjgl.opengl.GL11.glPopMatrix;
-import static org.lwjgl.opengl.GL11.glPushMatrix;
-import org.lwjgl.util.vector.Vector3f;
 
 /**
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Photon extends OutlinedObject implements Projectile, Renderable, Collidable {
-
+public class Photon implements Projectile, Object, Functor {
+    private static Queue<Photon> released = new LinkedList<Photon>();
+    private static Polygon photonPolygon;
+    public static float SCALE = .2f;
+    public static float SPEED = 40.f;
+    public static float LIFE = 1.8f;
     private Body body;
-    private static float SCALE = .2f;
-    private static float SPEED = 40.f;
-    private static float LIFE = 1.8f;
     public float life;
 
     public Photon() {
-        this.polygon = getPolygon();
-        this.body = Asteroids.getBody(this.polygon, TYPE, MASK, SCALE);
+        this.body = Asteroids.getBody(getPolygon(), TYPE, MASK, SCALE);
         this.body.setBullet(true);
         this.body.setUserData(this);
-        this.fillColor = new Vector3f(1.f, 1.f, 1.f);
         this.life = LIFE;
         Asteroids.add(this);
     }
@@ -42,14 +38,6 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
         if (life <= 0.f) {
             destroy();
         }
-    }
-
-    @Override
-    public void render(float alpha) {
-        glPushMatrix();
-        Asteroids.setTransform(this.body, alpha);
-        super.render(alpha);
-        glPopMatrix();
     }
 
     @Override
@@ -72,23 +60,40 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
     public float getRearmTime() {
         return .1f;
     }
-
-    @Override
-    public void dispatch(Collidable other) {
-        other.collide(this);
+   
+    public Body getBody() {
+        return this.body;
     }
 
     @Override
-    public void collide(Projectile other) {
+    public void dispatch(Functor func) {
+        func.visit(this);
+    }
+    
+    @Override
+    public void dispatch(Object obj) {
+        obj.dispatch(this);
     }
 
     @Override
-    public void collide(Rock other) {
+    public void visit(Debris obj) {
+    }
+
+    @Override
+    public void visit(Explosion obj) {
+    }
+    
+    @Override
+    public void visit(Photon other) {
+    }
+
+    @Override
+    public void visit(Rock other) {
         destroy();
     }
 
     @Override
-    public void collide(Starship other) {
+    public void visit(Starship other) {
         destroy();
     }
 
@@ -96,9 +101,9 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
         if (this.body.isActive()) {
             release();
             Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
-            ex.getFillColor().x = 1.f;
-            ex.getFillColor().y = .85f;
-            ex.getFillColor().z = .2f;
+            ex.getColor().x = 1.f;
+            ex.getColor().y = .85f;
+            ex.getColor().z = .2f;
         }
     }
 
@@ -110,20 +115,19 @@ public class Photon extends OutlinedObject implements Projectile, Renderable, Co
         }
     }
 
-    public static Photon getProjectile() {
+   public static Photon getProjectile() {
         Photon photon = released.isEmpty() ? new Photon() : released.remove();
         photon.body.setActive(true);
         photon.life = LIFE;
         Asteroids.add(photon);
         return photon;
     }
-
+    
     public static Polygon getPolygon() {
-        if (bodyPolygon == null) {
-            bodyPolygon = Polygon.getSquare(SCALE);
+        if (photonPolygon == null) {
+            photonPolygon = Polygon.getSquare(Photon.SCALE);
         }
-        return bodyPolygon;
+        return photonPolygon;
     }
-    private static Polygon bodyPolygon;
-    private static Queue<Photon> released = new LinkedList<Photon>();
+
 }

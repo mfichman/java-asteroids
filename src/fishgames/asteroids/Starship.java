@@ -14,8 +14,6 @@ import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
-import static org.lwjgl.opengl.GL11.glPopMatrix;
-import static org.lwjgl.opengl.GL11.glPushMatrix;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
@@ -24,22 +22,25 @@ import org.lwjgl.util.vector.Vector3f;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Starship extends OutlinedObject implements Renderable, Collidable {
-
-    private OutlinedObject mainThruster = new OutlinedObject();
-    private OutlinedObject shield = new OutlinedObject();
-    private Body body;
-    private boolean flickerOn;
-    private float shieldLife;
-    private String weapon = "Photon";
-    private static float SCALE = .85f;
-    private static float MAXSPEED = 30.f;
-    private static float SPIN = 4.f;
-    private static float DENSITY = 1.f;
-    private static float SHIELD_LIFE = 0.2f;
-    private static Vec2 THRUST = new Vec2(0, 1.0f);
+public class Starship implements Object, Functor {
+    private static Polygon hullPolygon;
+    private static Polygon mainThrusterPolygon;
+    private static Polygon shieldPolygon;
+    public static float SCALE = .85f;
+    public static float MAXSPEED = 30.f;
+    public static float SPIN = 4.f;
+    public static float DENSITY = 1.f;
+    public static float SHIELD_LIFE = 0.2f;
+    public static Vec2 THRUST = new Vec2(0, 1.0f);
     public static int TYPE = 0x2;
     public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
+    private Body body;
+    private boolean flickerOn = true;
+    private boolean isThrusterOn;
+    private float shieldLife;
+    private String weapon = "Photon";
+    private Vector3f color;
+    
     public Task flickerTask = new Task(0.07f) {
 
         @Override
@@ -69,23 +70,11 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
      * @param color
      */
     public Starship(Vector3f color) {
-        this.fillColor = color;
-        this.outlineColor = new Vector3f(1.f, 1.f, 1.f);
-
-        this.polygon = getHullPolygon();
-
-        this.mainThruster.polygon = getMainThrusterPolygon();
-        this.mainThruster.fillColor = new Vector3f(1.0f, .85f, 0.2f);
-
-        this.body = Asteroids.getBody(this.polygon, TYPE, MASK, DENSITY);
+        this.color = color;
+        this.body = Asteroids.getBody(getHullPolygon(), TYPE, MASK, DENSITY);
         this.body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
         this.body.setUserData(this);
         this.body.setLinearDamping(.4f);
-        
-        this.shield.polygon = getShieldPolygon();
-        this.shield.fillColor = new Vector3f(0.2f, 0.2f, 1.f);
-        this.shield.outlineColor = new Vector3f(0.4f, 0.4f, 1.f);
-        this.shield.alpha = .7f;
     }
 
     /**
@@ -127,28 +116,6 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         Asteroids.wrapTransform(this.body);
     }
 
-    /**
-     * Renders the starship, with interpolation factor 'alpha'.
-     *
-     * @param alpha
-     */
-    @Override
-    public void render(float alpha) {
-        if (this.flickerOn || !this.flickerTask.isActive()) {
-            glPushMatrix();
-            Asteroids.setTransform(this.body, alpha);
-            super.render(alpha);
-            if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
-                this.mainThruster.render(alpha);
-            }
-            if (this.shieldLife > 0.f) {
-                this.shield.alpha = this.shieldLife / SHIELD_LIFE * 0.5f;
-                this.shield.render(alpha);
-            }
-            glPopMatrix();
-        }
-    }
-
     public void hyperjump() {
         if (this.hyperspaceTask.isActive()) {
             return;
@@ -179,35 +146,74 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
         }
     }
     
-
+    
     @Override
-    public void dispatch(Collidable other) {
-        other.collide(this);
+    public void dispatch(Functor func) {
+        func.visit(this);
     }
 
     @Override
-    public void collide(Projectile other) {
+    public void dispatch(Object obj) {
+        obj.dispatch(this);
+    }
+
+    @Override
+    public void visit(Debris obj) {
+    }
+
+    @Override
+    public void visit(Explosion obj) {
+    }
+    
+    @Override
+    public void visit(Photon obj) {
         this.shieldLife = SHIELD_LIFE;
     }
 
     @Override
-    public void collide(Rock other) {
+    public void visit(Rock other) {
         //destroy();
         this.shieldLife = SHIELD_LIFE;
     }
 
     @Override
-    public void collide(Starship other) {
+    public void visit(Starship other) {
         this.shieldLife = SHIELD_LIFE;
     }
+    
+    public Vector3f getColor() {
+        return this.color;
+    }
+    
+    public Body getBody() {
+        return this.body;
+    }
+    
+    public boolean isShieldVisible() {
+        return this.shieldLife > 0.f;
+    }
+
+    public boolean isThrusterOn() {
+        return Keyboard.isKeyDown(Keyboard.KEY_I);
+    }
+    
+    public boolean isFlickerOn() {
+        return this.flickerOn || !this.flickerTask.isActive();
+    }
+    
+    public float getShieldLife() {
+        return this.shieldLife;
+    }
+
+    
     Explosion ex;
     
     public void destroy() {
         if (this.ex == null || !this.ex.getBody().isActive()) {
             ex = Explosion.getExplosion(3.f, this.body.getPosition());
-            ex.getFillColor().x = 1.f;
-            ex.getFillColor().y = .85f;
-            ex.getFillColor().z = .2f;
+            ex.getColor().x = 1.f;
+            ex.getColor().y = .85f;
+            ex.getColor().z = .2f;
             //Asteroids.remove(this);
             //this.body.setActive(false);
             /*
@@ -217,30 +223,31 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             ex.getColor().z = .0f;*/
         }
     }
-
+    
+    
     /**
      * Returns the polygon shape for the hull of the starship.
      *
      * @return
      */
-    static Polygon getHullPolygon() {
+    public static Polygon getHullPolygon() {
         if (hullPolygon == null) {
             FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 5);
-            vert.put(0, 0); 
+            vert.put(0, 0);
             vert.put(1, 0);
             // These zeros is here because an offset of 1 is added to account
             // for the 'center' point needed for most polygons in the game, 
             // which is skipped in line-rendering mode.
-            
-            vert.put(2, SCALE * 0.f); // Aft # 0
-            vert.put(3, SCALE * .8f);
-            vert.put(4, SCALE * -1.8f); // Right wing # 1
-            vert.put(5, SCALE * 1.8f);
-            vert.put(6, SCALE * 0.f); // Bow # 2
-            vert.put(7, SCALE * -2.2f);
-            vert.put(8, SCALE * 1.8f); // Left wing # 3
-            vert.put(9, SCALE * 1.8f);
-            
+
+            vert.put(2, Starship.SCALE * 0.f); // Aft # 0
+            vert.put(3, Starship.SCALE * .8f);
+            vert.put(4, Starship.SCALE * -1.8f); // Right wing # 1
+            vert.put(5, Starship.SCALE * 1.8f);
+            vert.put(6, Starship.SCALE * 0.f); // Bow # 2
+            vert.put(7, Starship.SCALE * -2.2f);
+            vert.put(8, Starship.SCALE * 1.8f); // Left wing # 3
+            vert.put(9, Starship.SCALE * 1.8f);
+
             IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
             ind.put(0, 1);
             ind.put(1, 2);
@@ -248,7 +255,6 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
             ind.put(3, 1);
             ind.put(4, 3);
             ind.put(5, 4);
-            
             hullPolygon = new Polygon(vert, ind);
 
             Vec2[] triangle1 = new Vec2[3];
@@ -275,58 +281,26 @@ public class Starship extends OutlinedObject implements Renderable, Collidable {
      *
      * @return
      */
-    static Polygon getMainThrusterPolygon() {
+    public static Polygon getMainThrusterPolygon() {
         if (mainThrusterPolygon == null) {
             FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 4);
-            vert.put(0, SCALE * 0.f); // Top
-            vert.put(1, SCALE * 1.1f);
-            vert.put(2, SCALE * -0.8f); // Left
-            vert.put(3, SCALE * 1.7f);
-            vert.put(4, SCALE * 0.f); // Bottom
-            vert.put(5, SCALE * 3.0f);
-            vert.put(6, SCALE * .8f); // Right
-            vert.put(7, SCALE * 1.7f); 
+            vert.put(0, Starship.SCALE * 0.f); // Top
+            vert.put(1, Starship.SCALE * 1.1f);
+            vert.put(2, Starship.SCALE * -0.8f); // Left
+            vert.put(3, Starship.SCALE * 1.7f);
+            vert.put(4, Starship.SCALE * 0.f); // Bottom
+            vert.put(5, Starship.SCALE * 3.0f);
+            vert.put(6, Starship.SCALE * .8f); // Right
+            vert.put(7, Starship.SCALE * 1.7f);
             mainThrusterPolygon = new Polygon(vert, null);
         }
         return mainThrusterPolygon;
     }
-    
-    static Polygon getShieldPolygon() {
+
+    public static Polygon getShieldPolygon() {
         if (shieldPolygon == null) {
             shieldPolygon = Polygon.getCircle(3.5f, 32);
-            /*
-            float scale = 1.4f;
-            
-            FloatBuffer vert = BufferUtils.createFloatBuffer(2 * 5);
-            vert.put(0, 0); 
-            vert.put(1, 0);
-            // These zeros is here because an offset of 1 is added to account
-            // for the 'center' point needed for most polygons in the game, 
-            // which is skipped in line-rendering mode.
-            vert.put(2, scale * 0.f); // Aft # 0
-            vert.put(3, scale * 1.2f);
-            vert.put(4, scale * -1.6f); // Right wing # 1
-            vert.put(5, scale * 1.5f);
-            vert.put(6, scale * 0.f); // Bow # 2
-            vert.put(7, scale * -2.2f);
-            vert.put(8, scale * 1.6f); // Left wing # 3
-            vert.put(9, scale * 1.5f);
-            
-            
-            IntBuffer ind = BufferUtils.createIntBuffer(2 * 3);
-            ind.put(0, 1);
-            ind.put(1, 2);
-            ind.put(2, 3);
-            ind.put(3, 1);
-            ind.put(4, 3);
-            ind.put(5, 4);
-            
-            shieldPolygon = new Polygon(vert, ind);*/
         }
         return shieldPolygon;
     }
-    
-    static Polygon hullPolygon;
-    static Polygon mainThrusterPolygon;
-    static Polygon shieldPolygon;
 }

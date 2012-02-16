@@ -4,10 +4,8 @@
  */
 package fishgames.asteroids;
 
-import java.awt.Font;
 import java.awt.FontFormatException;
 import java.io.IOException;
-import java.net.URL;
 import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
@@ -19,12 +17,8 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Vector3f;
-import org.newdawn.slick.Color;
-import org.newdawn.slick.TrueTypeFont;
 
 /**
  * Big huge static class to hold all the game-specific info, like world size,
@@ -35,47 +29,63 @@ import org.newdawn.slick.TrueTypeFont;
 public class Asteroids {
 
     private static World world = new World(new Vec2(0, 0), true);
-    private static Set<Renderable> renderables = new HashSet<Renderable>();
-    private static ArrayList<Renderable> working = new ArrayList<Renderable>();
+    private static Renderer renderer;
+    private static Set<Object> objects = new HashSet<Object>();
+    private static ArrayList<Object> working = new ArrayList<Object>();
     private static long accum = 0;
     private static long last = System.nanoTime();
     private static float timestep = 1.f / 100.f;
-    private static boolean renderablesDirty = false;
+    private static boolean objectsDirty = false;
     private static Random random = new Random();
-    
+
+    /**
+     * Returns a random number between min and max.
+     * @param min
+     * @param max
+     * @return 
+     */
     public static int random(int min, int max) {
         return (Math.abs(random.nextInt()) % (max - min + 1)) + min;
     }
-    
+
     /**
-     * 
-     * @param renderable 
+     * Adds an object to the update and render list for the game.
+     * @param obj 
      */
-    public static void add(Renderable renderable) {
-        renderables.add(renderable);
-        renderablesDirty = true;
+    public static void add(Object obj) {
+        objects.add(obj);
+        objectsDirty = true;
     }
-    
-    /*
-     * 
+
+    /**
+     * Removes an object from the update and render list for the game.  The
+     * change to the list will be reflected at the next frame.
+     * @param obj 
      */
-    public static void remove(Renderable renderable) {
-        renderables.remove(renderable);
-        renderablesDirty = true;
+    public static void remove(Object obj) {
+        objects.remove(obj);
+        objectsDirty = true;
     }
-    
+
+    /**
+     * Returns all objects in the update and render list.
+     * @return 
+     */
+    public static ArrayList<Object> getObjects() {
+        return working;
+    }
+
     /**
      * Returns the size of the world in world units (kind-of-meters).
-     *
      * @return
      */
     public static Vec2 getWorldSize() {
         return new Vec2(80, 80);
     }
-    
+
     /**
      * Returns a random position on the map.
-     * @return 
+     * @return
      */
     public static Vec2 getRandomPos() {
         float x = (float) (Math.random() * Asteroids.getWorldSize().x);
@@ -84,33 +94,20 @@ public class Asteroids {
     }
 
     /**
-     * Sets the model-view transform to be equal to the transform of the body,
-     * with interpolation by alpha.
-     *
-     * @param body
-     * @param alpha
+     * Returns the world, used to carry out physics calculations (jBox2d).
+     * @return 
      */
-    public static void setTransform(Body body, float alpha) {
-        float angle = body.getAngle();
-        float angularVel = body.getAngularVelocity();
-        ///float angle1 = angle * (1 - alpha);
-        //float angle2 = (angle + angularVel) * (alpha);
-        //float finalAngle = angle1 + angle2;
-        float finalAngle = angle;
-
-        Vec2 pos = body.getPosition();
-        Vec2 linearVel = body.getLinearVelocity();
-        Vec2 pos1 = pos.mul(1 - alpha);
-        Vec2 pos2 = (pos.add(linearVel.mul(1.f / 60.f))).mul(alpha);
-        Vec2 finalPos = pos1.add(pos2);
-        glTranslatef(finalPos.x, finalPos.y, 0.f);
-        glRotatef((float) (finalAngle * 180.f / Math.PI), 0, 0, 1.f);
-        // Rotate around z-axis
+    public static World getWorld() {
+        return world;
     }
-    
 
     /**
-     * Creates a new body using this shape.
+     * Returns a Body that was created with a fixture for each shape in polygon.
+     * Also sets various other properties of Body all at once.
+     * @param polygon
+     * @param type
+     * @param mask
+     * @param density
      * @return 
      */
     public static Body getBody(Polygon polygon, int type, int mask, float density) {
@@ -129,9 +126,15 @@ public class Asteroids {
         body.setLinearDamping(0.f);
         return body;
     }
-    
+
     /**
-     * Returns a circle body.
+     * Returns a body with a single circle shape fixture.  Also sets various
+     * other properties of Body all at once.
+     * @param radius
+     * @param type
+     * @param mask
+     * @param density
+     * @return 
      */
     public static Body getBody(float radius, int type, int mask, float density) {
         CircleShape shape = new CircleShape();
@@ -149,7 +152,6 @@ public class Asteroids {
 
     /**
      * Wraps the transform to the size of the map.
-     *
      * @param body
      */
     public static void wrapTransform(Body body) {
@@ -167,49 +169,35 @@ public class Asteroids {
         }
         body.setTransform(pos, body.getAngle());
     }
+    
+    /**
+     * Steps the physics simulation forward once, by running jBox2d forward a
+     * timestep, and then checking the contact list.  Also calls update() for
+     * each object in the update list.
+     */
+    public static void step() {
+        getWorld().step(timestep, 8, 3);
+        for (Contact c = getWorld().getContactList(); c != null; c = c.getNext()) {
+            java.lang.Object a = c.getFixtureA().getBody().getUserData();
+            java.lang.Object b = c.getFixtureB().getBody().getUserData();
+            if (a != null && b != null && c.isTouching()) {
+                Functor ca = (Functor) a;
+                Functor cb = (Functor) b;
+                ca.dispatch((Object) cb);
+                cb.dispatch((Object) ca);
+            }
+        }
+        for (Object object : working) {
+            object.update(timestep);
+        }
+    }
 
     /**
-     * Update the game state if necessary, and render to the screen.
+     * Updates all tasks. Find any tasks whose deadline has been reached, and
+     * executes those tasks.
      */
-    public static void update() {
-        long increment = (long) (timestep * 1000000000);
+    public static void updateTasks() {
         long time = System.nanoTime();
-
-        if (!Display.isVisible()) {
-            last = time;
-            return;
-        }
-        
-        if (renderablesDirty) {
-            renderablesDirty = false;
-            working.clear();
-            working.addAll(Asteroids.renderables);
-        }
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glLoadIdentity();
-        glScalef(10.f, 10.f, 10.f);
-
-        // Update all objects and tasks in the task queue.
-        accum += time - last;
-        while (accum >= increment) {
-            getWorld().step(timestep, 8, 3);
-            accum -= increment;
-            for (Contact c = getWorld().getContactList(); c != null; c = c.getNext()) {
-                Object a = c.getFixtureA().getBody().getUserData();
-                Object b = c.getFixtureB().getBody().getUserData();
-                if (a != null && b != null && c.isTouching()) {
-                    Collidable ca = (Collidable) a;
-                    Collidable cb = (Collidable) b;
-                    ca.dispatch(cb);
-                    cb.dispatch(ca);
-                }
-            }
-            for (Renderable object : working) {
-                object.update(timestep);
-            }
-
-        }
 
         // Update all current tasks
         PriorityQueue<Task> tasks = Task.getActiveTasks();
@@ -222,39 +210,50 @@ public class Asteroids {
                 task.setDeadline(0);
             }
         }
+    }
+
+    /**
+     * Update the game state if necessary, and render to the screen.  Update the
+     * working object array if the object set was dirty.
+     */
+    public static void updateGame() {
+        long increment = (long) (timestep * 1000000000);
+        long time = System.nanoTime();
+
+        if (!Display.isVisible()) {
+            last = time;
+            return;
+        }
+
+        if (objectsDirty) {
+            objectsDirty = false;
+            working.clear();
+            working.addAll(Asteroids.objects);
+        }
+
+        // Update all objects and tasks in the task queue.
+        accum += time - last;
+        while (accum >= increment) {
+            step();
+            accum -= increment;
+        }
 
         // Render all objects; be sure to pass the 'frame' remainder'
-        float interp = (float) accum / (float) increment;
-        for (Renderable object : working) {
-            object.render(interp);
-        }
-        
-        
-        glLoadIdentity(); 
-       //Color.white.bind();
-        glEnable(GL_BLEND);
-        glEnable(GL_TEXTURE_2D);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        font.drawString(20, 300, "extreme asteroids", Color.white);
-        glDisable(GL_TEXTURE_2D);
-        glDisable(GL_BLEND);
+        renderer.render((float) accum / (float) increment);
 
         Display.update();
         Display.sync(50);
-        
-        
         last = time;
     }
-    
-    static TrueTypeFont font;
-    
+
     /**
+     * Runs the game.
      * @param args the command line arguments
      */
     public static void main(String[] args) throws LWJGLException, IOException, FontFormatException {
         // TODO code application logic here
-        int width = (int) (getWorldSize().x * 10);
-        int height = (int) (getWorldSize().y * 10);
+        int width = (int) (Asteroids.getWorldSize().x * 10);
+        int height = (int) (Asteroids.getWorldSize().y * 10);
         DisplayMode mode = new DisplayMode(width, height);
         Display.setDisplayMode(mode);
         Display.setFullscreen(false);
@@ -265,40 +264,33 @@ public class Asteroids {
             Display.create(new PixelFormat(8, 8, 8, 8, 0));
         }
 
+        renderer = new Renderer();
+
         Keyboard.create();
         Mouse.create();
-        
-        glClearColor(0.0f, 0, 0, 1.0f);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_LIGHTING);
-
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, mode.getWidth(), mode.getHeight(), 0.f, -1.f, 1.f);
-        glMatrixMode(GL_MODELVIEW);
 
         for (int i = 0; i < 8; i++) {
             Rock.getRock(Rock.LARGE);
         }
         add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
-        glEnable(GL_LINE_SMOOTH);
-        glEnable(GL_MULTISAMPLE);
-      
-        URL url = Asteroids.class.getResource("/fishgames/asteroids/fonts/Russel.ttf");
-        Font awtFont = Font.createFont(Font.TRUETYPE_FONT, url.openStream());
-        awtFont = awtFont.deriveFont(Font.PLAIN, 60.f);
-        font = new TrueTypeFont(awtFont, true);
-
         while (!Display.isCloseRequested()) {
-            update();
+            updateTasks();
+            updateGame();
         }
         Display.destroy();
     }
-
-    /**
-     * @return the world
-     */
-    public static World getWorld() {
-        return world;
-    }
 }
+
+/*
+ * static TrueTypeFont font; URL url =
+ * Asteroids.class.getResource("/fishgames/asteroids/fonts/Russel.ttf"); Font
+ * awtFont = Font.createFont(Font.TRUETYPE_FONT, url.openStream()); awtFont =
+ * awtFont.deriveFont(Font.PLAIN, 60.f); font = new TrueTypeFont(awtFont, true);
+ */
+
+/*
+ * glLoadIdentity(); //Color.white.bind(); glEnable(GL_BLEND);
+ * glEnable(GL_TEXTURE_2D); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+ * font.drawString(20, 300, "extreme asteroids", Color.white);
+ * glDisable(GL_TEXTURE_2D); glDisable(GL_BLEND);
+ */

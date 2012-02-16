@@ -14,7 +14,6 @@ import org.jbox2d.collision.shapes.PolygonShape;
 import org.jbox2d.collision.shapes.Shape;
 import org.jbox2d.common.Vec2;
 import org.lwjgl.BufferUtils;
-import static org.lwjgl.opengl.GL15.*;
 
 /**
  * Holder for a polygon (graphical and physical models). Since all the objects
@@ -24,38 +23,23 @@ import static org.lwjgl.opengl.GL15.*;
  */
 public class Polygon {
 
-    /**
-     * Vertex buffer object handle.
-     */
-    private int vertices;
-    /**
-     * Index buffer object handle.
-     */
-    private int indices;
+    private int vertexBuffer;
+    private int indexBuffer;
+    
     private int numVertices;
     private int numIndices;
-    /**
-     * Polygon shape for Box2D
-     */
+    
+    private FloatBuffer vertexArray;
+    private IntBuffer indexArray;
+    
     private ArrayList<Shape> shape;
 
     public Polygon(FloatBuffer vert, IntBuffer ind) {
-        IntBuffer intBuf = BufferUtils.createIntBuffer(1);
-        glGenBuffers(intBuf);
-
-        this.vertices = intBuf.get(0);
+        this.vertexArray = vert;
+        this.indexArray = ind;
         this.numVertices = vert.limit() / 2;
-        glBindBuffer(GL_ARRAY_BUFFER, this.vertices);
-        glBufferData(GL_ARRAY_BUFFER, vert, GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
         if (ind != null) {
-            glGenBuffers(intBuf);
-            this.indices = intBuf.get(0);
             this.numIndices = ind.limit();
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.indices);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind, GL_STATIC_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
     }
 
@@ -80,19 +64,6 @@ public class Polygon {
      */
     public List<Shape> getShapes() {
         return this.shape;
-    }
-
-    /**
-     * Releases this object (specifically, by freeing the hardware vertex and
-     * index buffers).
-     */
-    public void release() {
-        IntBuffer buf = BufferUtils.createIntBuffer(2);
-        buf.put(0, this.getVertices());
-        buf.put(1, this.getIndices());
-        glDeleteBuffers(buf);
-        this.vertices = 0;
-        this.indices = 0;
     }
 
     public static Polygon getCircle(float radius, int segments) {
@@ -148,17 +119,17 @@ public class Polygon {
     }
 
     /**
-     * @return the vertices
+     * @return the vertexBuffer
      */
-    public int getVertices() {
-        return vertices;
+    public int getVertexBuffer() {
+        return vertexBuffer;
     }
 
     /**
-     * @return the vertices
+     * @return the vertexBuffer
      */
-    public int getIndices() {
-        return indices;
+    public int getIndexBuffer() {
+        return indexBuffer;
     }
 
     /**
@@ -170,5 +141,33 @@ public class Polygon {
 
     public int getNumVertices() {
         return numVertices;
+    }
+
+    /**
+     * @param vertexBuffer the vertexBuffer to set
+     */
+    public void setVertexBuffer(int vertexBuffer) {
+        this.vertexBuffer = vertexBuffer;
+    }
+
+    /**
+     * @param indexBuffer the indexBuffer to set
+     */
+    public void setIndexBuffer(int indexBuffer) {
+        this.indexBuffer = indexBuffer;
+    }
+
+    /**
+     * @return the vertexArray
+     */
+    public FloatBuffer getVertexArray() {
+        return vertexArray;
+    }
+
+    /**
+     * @return the indexArray
+     */
+    public IntBuffer getIndexArray() {
+        return indexArray;
     }
 }
