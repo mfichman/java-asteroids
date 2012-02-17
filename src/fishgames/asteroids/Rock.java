@@ -7,9 +7,9 @@ package fishgames.asteroids;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.util.*;
+import java.util.ArrayList;
 import org.jbox2d.common.Vec2;
-import org.jbox2d.dynamics.*;
+import org.jbox2d.dynamics.Body;
 import org.lwjgl.BufferUtils;
 
 /**
@@ -18,9 +18,8 @@ import org.lwjgl.BufferUtils;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Rock implements Object, Functor {
+public abstract class Rock extends Entity implements Functor {
 
-    private static Map<Float, Queue<Rock>> released = new HashMap<Float, Queue<Rock>>();
     private static ArrayList<Polygon> largeRockPolygon;
     private static ArrayList<Polygon> mediumRockPolygon;
     private static ArrayList<Polygon> smallRockPolygon;
@@ -31,7 +30,7 @@ public class Rock implements Object, Functor {
     public static float SMALL = 2.0f;
     public static float MEDIUM = 4.0f;
     public static float LARGE = 6.0f;
-    private Body body;
+    protected Body body;
     private float radius;
 
     /**
@@ -39,7 +38,7 @@ public class Rock implements Object, Functor {
      *
      * @param diameter size of the rock
      */
-    public Rock(float radius, int segments) {
+    public Rock(float radius) {
 
         this.body = Asteroids.getBody(radius - MARGIN, TYPE, MASK, DENSITY);
         this.body.setUserData(this);
@@ -69,25 +68,8 @@ public class Rock implements Object, Functor {
         func.visit(this);
     }
 
-    /**
-     * Releases the rock and returns it to the pool of other rocks.
-     */
-    public void release() {
-        if (this.body.isActive()) {
-            this.body.setActive(false);
-            Asteroids.remove(this);
-            Queue<Rock> queue = released.get(this.radius);
-            if (queue == null) {
-                queue = new LinkedList<Rock>();
-                released.put(this.radius, queue);
-            }
-            queue.add(this);
-        }
-    }
-    
-
     @Override
-    public void dispatch(Object obj) {
+    public void dispatch(Entity obj) {
         obj.dispatch(this);
     }
 
@@ -111,82 +93,8 @@ public class Rock implements Object, Functor {
     @Override
     public void visit(Starship obj) {
     }
-
-    public void destroy() {
-        if (!this.body.isActive()) {
-            return;
-        }
-        this.release();
-        
-        int num = 0;
-        float size = 0.f;
-        
-        if (this.radius == LARGE) {
-            size = MEDIUM;
-            num = Asteroids.random(2, 3);
-        } else if (this.radius == MEDIUM) {
-            size = SMALL;
-            num = Asteroids.random(2, 3);
-        } else {
-            for (int i = 0; i < 3; i++) {
-                Debris.getDebris(this.body.getPosition());
-            }
-        }
-        for (int i = 0; i < num; i++) {
-            getRock(size, this.body.getPosition());
-        }
-    }
-
-    /**
-     * Gets a rock of the given size, or creates one.
-     *
-     * @param radius
-     * @param position
-     * @return
-     */
-    public static Rock getRock(float radius, Vec2 position) {
-        Queue<Rock> queue = released.get(radius);
-        Rock rock;
-        if (queue != null && queue.size() > 0) {
-            rock = queue.remove();
-        } else {
-            rock = new Rock(radius, 16);
-        }
-
-        rock.body.setTransform(position, 0.f);
-        float minSpeed;
-        float maxSpeed;
-        if (radius == LARGE) {
-            minSpeed = 4.f;
-            maxSpeed = 6.f;
-        } else if (radius == MEDIUM) {
-            minSpeed = 6.f;
-            maxSpeed = 8.f;
-        } else {
-            minSpeed = 6.f;
-            maxSpeed = 9.f;
-        }
-
-        float speed = (float) (Math.random() * (maxSpeed - minSpeed)) + minSpeed;
-        float angle = (float) (2 * Math.PI * Math.random());
-        float dx = (float) (speed * Math.cos(angle));
-        float dy = (float) (speed * Math.sin(angle));
-
-        //rock.body.applyLinearImpulse(new Vec2(dx, dy), rock.body.getWorldCenter());
-
-        rock.body.setLinearVelocity(new Vec2(dx, dy));
-        rock.body.setActive(true);
-        Asteroids.add(rock);
-
-        return rock;
-    }
-
-    public static Rock getRock(float radius) {
-        float x = (float) (Math.random() * Asteroids.getWorldSize().x);
-        float y = (float) (Math.random() * Asteroids.getWorldSize().y);
-
-        return getRock(radius, new Vec2(x, y));
-    }
+    
+    public abstract void destroy();
 
     public static Polygon getLargePolygon(Rock rock) {
         // Select a polygon to render a rock, using the rock's hash code
@@ -257,5 +165,75 @@ public class Rock implements Object, Functor {
             }
         }
         return new Polygon(vert, ind);
+    }
+
+    public static class Small extends Rock {
+
+        public Small() {
+            super(SMALL);
+        }
+
+        @Override
+        public void destroy() {
+            if (this.body.isActive()) {
+                setActive(false);
+                for (int i = 0; i < 3; i++) {
+                    Debris.getDebris(this.body.getPosition());
+                }
+            }
+        }
+        
+        public static Small getRock(Vec2 position) {
+            Small rock = Asteroids.newEntity(Small.class);
+            rock.body.setTransform(position, 0.f);
+            rock.body.setLinearVelocity(Asteroids.getRandomVel(6.f, 9.f));
+            return rock;
+        }
+    }
+
+    public static class Medium extends Rock {
+        public Medium() {
+            super(MEDIUM);
+        }
+
+        @Override
+        public void destroy() {
+            if (this.body.isActive()) {
+                setActive(false);
+                for (int i = 0; i < Asteroids.random(2, 3); i++) {
+                    Small.getRock(this.body.getPosition());
+                }
+            }
+        }
+        
+        public static Medium getRock(Vec2 position) {
+            Medium rock = Asteroids.newEntity(Medium.class);
+            rock.body.setTransform(position, 0.f);
+            rock.body.setLinearVelocity(Asteroids.getRandomVel(6.f, 8.f));
+            return rock;
+        }
+    }
+
+    public static class Large extends Rock {
+        public Large() {
+            super(LARGE);
+        }
+
+        @Override
+        public void destroy() {
+            if (this.body.isActive()) {
+                setActive(false);
+                for (int i = 0; i < Asteroids.random(2, 3); i++) {
+                    Medium.getRock(this.body.getPosition());
+                }
+            }
+        }
+        
+        public static Large getRock(Vec2 position) {
+            Large rock = Asteroids.newEntity(Large.class);
+            rock.body.setTransform(position, 0.f);
+            rock.body.setLinearVelocity(Asteroids.getRandomVel(4.f, 6.f));
+            return rock;
+        }
     }
 }

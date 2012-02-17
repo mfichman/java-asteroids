@@ -6,6 +6,7 @@
 package fishgames.asteroids;
 
 import java.nio.IntBuffer;
+import java.util.Collection;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.lwjgl.BufferUtils;
@@ -38,20 +39,20 @@ public class Renderer implements Functor {
         glMatrixMode(GL_MODELVIEW);
     }
 
-    public void render(float alpha) {
+    public void render(Collection<Entity> objects, float alpha) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
         glScalef(10.f, 10.f, 10.f);
         this.interpolation = alpha;
 
-        for (Object object : Asteroids.getObjects()) {
+        for (Entity object : objects) {
             object.dispatch(this);
         }
         // DISPATCH
     }
 
     @Override
-    public void dispatch(Object obj) {
+    public void dispatch(Entity obj) {
         obj.dispatch(this);
     }
 

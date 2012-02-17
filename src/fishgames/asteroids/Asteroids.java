@@ -6,6 +6,11 @@ package fishgames.asteroids;
 
 import java.awt.FontFormatException;
 import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
@@ -22,69 +27,94 @@ import org.lwjgl.util.vector.Vector3f;
 
 /**
  * Big huge static class to hold all the game-specific info, like world size,
- * pointers to useful objects, utility methods, etc.
+ * pointers to useful active, utility methods, etc.
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Asteroids {
 
     private static World world = new World(new Vec2(0, 0), true);
+    private static Factory factory = new Factory();
     private static Renderer renderer;
-    private static Set<Object> objects = new HashSet<Object>();
-    private static ArrayList<Object> working = new ArrayList<Object>();
+    private static Serializer serializer = new Serializer();
+    private static Deserializer deserializer = new Deserializer();
+    private static Selector selector;
+    private static SocketAddress address;
+    private static Map<SocketAddress, Peer> peerByAddress = new HashMap<SocketAddress, Peer>();
+    private static Set<Entity> active = new HashSet<Entity>();
+    private static ArrayList<Entity> working = new ArrayList<Entity>();
     private static long accum = 0;
     private static long last = System.nanoTime();
     private static float timestep = 1.f / 100.f;
-    private static boolean objectsDirty = false;
+    private static boolean activeDirty = false;
     private static Random random = new Random();
+    private static byte[] tempArray = new byte[1024];
+    public static final int BUFSIZE = 4096;
+    public static final byte MESSAGE_DATA = 2;
+    public static final byte MESSAGE_NEW = 3;
 
     /**
      * Returns a random number between min and max.
+     *
      * @param min
      * @param max
-     * @return 
+     * @return
      */
     public static int random(int min, int max) {
         return (Math.abs(random.nextInt()) % (max - min + 1)) + min;
     }
+    
+    /**
+     * Creates a new entity with the given class.
+     * @param <T>
+     * @param type
+     * @return 
+     */
+    public static <T> T newEntity(Class type) {
+        return factory.newEntity(type);
+    }
 
     /**
      * Adds an object to the update and render list for the game.
-     * @param obj 
+     *
+     * @param obj
      */
-    public static void add(Object obj) {
-        objects.add(obj);
-        objectsDirty = true;
+    public static void addActiveObject(Entity obj) {
+        active.add(obj);
+        activeDirty = true;
     }
 
     /**
-     * Removes an object from the update and render list for the game.  The
+     * Removes an object from the update and render list for the game. The
      * change to the list will be reflected at the next frame.
-     * @param obj 
+     *
+     * @param obj
      */
-    public static void remove(Object obj) {
-        objects.remove(obj);
-        objectsDirty = true;
-    }
-
-    /**
-     * Returns all objects in the update and render list.
-     * @return 
-     */
-    public static ArrayList<Object> getObjects() {
-        return working;
+    public static void removeActiveObject(Entity obj) {
+        active.remove(obj);
+        activeDirty = true;
     }
 
     /**
      * Returns the size of the world in world units (kind-of-meters).
+     *
      * @return
      */
     public static Vec2 getWorldSize() {
         return new Vec2(80, 80);
     }
+    
+    public static Vec2 getRandomVel(float min, float max) {
+        float speed = (float) (Math.random() * (max - min)) + min;
+        float angle = (float) (2 * Math.PI * Math.random());
+        float dx = (float) (speed * Math.cos(angle));
+        float dy = (float) (speed * Math.sin(angle));
+        return new Vec2(dx, dy);
+    }
 
     /**
      * Returns a random position on the map.
+     *
      * @return
      */
     public static Vec2 getRandomPos() {
@@ -95,20 +125,36 @@ public class Asteroids {
 
     /**
      * Returns the world, used to carry out physics calculations (jBox2d).
-     * @return 
+     *
+     * @return
      */
     public static World getWorld() {
         return world;
+    }
+    
+    /**
+     * Returns a peer by the address the peer is connecting from.
+     * @param address
+     * @return 
+     */
+    public static Peer getPeerByAddress(SocketAddress address) {
+        Peer peer = peerByAddress.get(address);
+        if (peer == null) {
+            peer = new Peer();
+            peerByAddress.put(address, peer);
+        }
+        return peer;
     }
 
     /**
      * Returns a Body that was created with a fixture for each shape in polygon.
      * Also sets various other properties of Body all at once.
+     *
      * @param polygon
      * @param type
      * @param mask
      * @param density
-     * @return 
+     * @return
      */
     public static Body getBody(Polygon polygon, int type, int mask, float density) {
         BodyDef bodyDef = new BodyDef();
@@ -128,13 +174,14 @@ public class Asteroids {
     }
 
     /**
-     * Returns a body with a single circle shape fixture.  Also sets various
+     * Returns a body with a single circle shape fixture. Also sets various
      * other properties of Body all at once.
+     *
      * @param radius
      * @param type
      * @param mask
      * @param density
-     * @return 
+     * @return
      */
     public static Body getBody(float radius, int type, int mask, float density) {
         CircleShape shape = new CircleShape();
@@ -152,6 +199,7 @@ public class Asteroids {
 
     /**
      * Wraps the transform to the size of the map.
+     *
      * @param body
      */
     public static void wrapTransform(Body body) {
@@ -169,10 +217,10 @@ public class Asteroids {
         }
         body.setTransform(pos, body.getAngle());
     }
-    
+
     /**
      * Steps the physics simulation forward once, by running jBox2d forward a
-     * timestep, and then checking the contact list.  Also calls update() for
+     * timestep, and then checking the contact list. Also calls update() for
      * each object in the update list.
      */
     public static void step() {
@@ -183,11 +231,11 @@ public class Asteroids {
             if (a != null && b != null && c.isTouching()) {
                 Functor ca = (Functor) a;
                 Functor cb = (Functor) b;
-                ca.dispatch((Object) cb);
-                cb.dispatch((Object) ca);
+                ca.dispatch((Entity) cb);
+                cb.dispatch((Entity) ca);
             }
         }
-        for (Object object : working) {
+        for (Entity object : working) {
             object.update(timestep);
         }
     }
@@ -213,7 +261,149 @@ public class Asteroids {
     }
 
     /**
-     * Update the game state if necessary, and render to the screen.  Update the
+     * Reads a packet, which may contain one or more messages.
+     *
+     * @param channel
+     * @throws IOException
+     */
+    public static void readPacket(DatagramChannel channel) throws IOException {
+        ByteBuffer buffer = deserializer.getBuffer();
+        buffer.clear();
+        SocketAddress addr = channel.receive(buffer);
+        if (addr == null) {
+            return;
+        } else {
+            buffer.flip();
+        }
+
+        while (buffer.hasRemaining()) {
+            readMessage(buffer);
+        }
+    }
+
+    /**
+     * Reads a single message from a byte buffer. A single message may have one
+     * or more segments per object in the message.  The format of a message is:
+     * 
+     * type [1] length [2] payload [n]
+     *
+     * @param buffer
+     */
+    public static void readMessage(ByteBuffer buffer) {
+        byte type = buffer.get();
+        short length = buffer.getShort(buffer.position());
+        int start = buffer.position() + 2; // +2 for the length field itself.
+        
+        // Select the message to parse by using the 'type' field of the message.
+        switch(type) {
+            case MESSAGE_DATA:
+                readDataMessage(buffer);
+                break;
+            case MESSAGE_NEW:
+                readNewMessage(buffer);
+                break;
+        }
+        
+        if (buffer.position() != (start+length)) {
+            System.err.printf("Invalid message length.  Expected message "
+                + "length: %d.  Actual message length: %d", length, 
+                buffer.position() - start);
+        }
+        if (buffer.position() > (start+length)) {
+            throw new RuntimeException("Invalid message length");
+        }
+        
+        // Fast-forward to the end of the message if the message length was
+        // incorrect.
+        if (buffer.position() < (start+length)) {
+            buffer.position(start+length);
+        }
+    }
+    
+    /**
+     * De-serializes an array of object state.  Each object consists of one or
+     * more attributes.  The serializer de-serializes an object.  The format
+     * of a data message is:
+     * 
+     * length [2] (id [2] payload [n])+
+     * 
+     * Note that the 'type' message field is already parsed at this point.
+     * 
+     * @param buffer 
+     */
+    public static void readDataMessage(ByteBuffer buffer) {
+        // Before reading the message, mark all entities for release.  If any
+        // entity doesn't appear in the message, consider it deactivated.
+        Peer peer = getPeerByAddress(address);
+        for (Entity ent : peer.getEntities()) {
+            ent.setMarkedForRelease(true);
+        }
+        
+        short length = buffer.getShort();
+        while(buffer.position() < length) {
+            short id = buffer.getShort();
+            Entity ent = peer.getEntity(id);
+            if (ent == null) {
+                deserializer.dispatch(ent);
+            }
+            ent.setActive(true);
+            ent.setMarkedForRelease(false);
+        }
+        
+        for (Entity ent : peer.getEntities()) {
+            if (ent.isMarkedForRelease()) {
+                ent.setActive(false);
+            }
+        }
+    }
+    
+    /**
+     * De-serializes a request to create a new object.  The object was created
+     * on the remote side; this adds the object on the local side.   The format 
+     * of a "new" message is: 
+     *
+     * length [2] (id [2] length [2] name [n])+
+     * 
+     * Note that the 'type' message field is already parsed at this point.
+     * @param buffer 
+     */
+    public static void readNewMessage(ByteBuffer buffer) {
+        Peer peer = getPeerByAddress(address);
+        short length = buffer.getShort();
+        
+        while(buffer.position() < length) {
+            short id = buffer.getShort();
+            short typeNameLength = buffer.getShort();
+            buffer.get(tempArray, 0, typeNameLength);
+            String typeName = new String(tempArray, 0, typeNameLength);
+            peer.newEntity(id, typeName);
+        }
+    }
+
+    /**
+     * Updates the network by polling for read/write events. Serializes any
+     * active active that are deemed necessary for serialization. Also,
+     * de-multiplexes received messages.
+     */
+    public static void updateNetwork() throws IOException {
+        selector.selectNow();
+
+        Iterator<SelectionKey> i = selector.selectedKeys().iterator();
+        while (i.hasNext()) {
+            SelectionKey key = i.next();
+            i.remove();
+
+            if (key.isValid() && key.isReadable()) {
+                readPacket((DatagramChannel) key.channel());
+            }
+            if (key.isValid() && key.isWritable()) {
+                //DatagramChannel channel = (DatagramChannel) key.channel();
+            }
+        }
+    }
+
+    /**
+     * Update the game state if necessary, and render to the screen. Update the
      * working object array if the object set was dirty.
      */
     public static void updateGame() {
@@ -225,21 +415,21 @@ public class Asteroids {
             return;
         }
 
-        if (objectsDirty) {
-            objectsDirty = false;
+        if (activeDirty) {
+            activeDirty = false;
             working.clear();
-            working.addAll(Asteroids.objects);
+            working.addAll(Asteroids.active);
         }
 
-        // Update all objects and tasks in the task queue.
+        // Update all active and tasks in the task queue.
         accum += time - last;
         while (accum >= increment) {
             step();
             accum -= increment;
         }
 
-        // Render all objects; be sure to pass the 'frame' remainder'
-        renderer.render((float) accum / (float) increment);
+        // Render all active; be sure to pass the 'frame' remainder'
+        renderer.render(active, (float) accum / (float) increment);
 
         Display.update();
         Display.sync(50);
@@ -248,6 +438,7 @@ public class Asteroids {
 
     /**
      * Runs the game.
+     *
      * @param args the command line arguments
      */
     public static void main(String[] args) throws LWJGLException, IOException, FontFormatException {
@@ -265,14 +456,15 @@ public class Asteroids {
         }
 
         renderer = new Renderer();
+        selector = Selector.open();
 
         Keyboard.create();
         Mouse.create();
 
         for (int i = 0; i < 8; i++) {
-            Rock.getRock(Rock.LARGE);
+            Rock.Large.getRock(Asteroids.getRandomPos());
         }
-        add(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
+        addActiveObject(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
         while (!Display.isCloseRequested()) {
             updateTasks();
             updateGame();

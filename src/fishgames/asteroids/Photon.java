@@ -5,22 +5,17 @@
  */
 package fishgames.asteroids;
 
-import java.util.LinkedList;
-import java.util.Queue;
 import org.jbox2d.common.Vec2;
-import org.jbox2d.dynamics.Body;
 
 /**
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Photon implements Projectile, Object, Functor {
-    private static Queue<Photon> released = new LinkedList<Photon>();
+public class Photon extends Entity implements Projectile  , Functor {
     private static Polygon photonPolygon;
     public static float SCALE = .2f;
     public static float SPEED = 40.f;
     public static float LIFE = 1.8f;
-    private Body body;
     public float life;
 
     public Photon() {
@@ -28,7 +23,7 @@ public class Photon implements Projectile, Object, Functor {
         this.body.setBullet(true);
         this.body.setUserData(this);
         this.life = LIFE;
-        Asteroids.add(this);
+        Asteroids.addActiveObject(this);
     }
 
     @Override
@@ -61,17 +56,13 @@ public class Photon implements Projectile, Object, Functor {
         return .1f;
     }
    
-    public Body getBody() {
-        return this.body;
-    }
-
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
     }
     
     @Override
-    public void dispatch(Object obj) {
+    public void dispatch(Entity obj) {
         obj.dispatch(this);
     }
 
@@ -99,7 +90,7 @@ public class Photon implements Projectile, Object, Functor {
 
     public void destroy() {
         if (this.body.isActive()) {
-            release();
+            setActive(false);
             Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
             ex.getColor().x = 1.f;
             ex.getColor().y = .85f;
@@ -107,19 +98,9 @@ public class Photon implements Projectile, Object, Functor {
         }
     }
 
-    public void release() {
-        if (this.body.isActive()) {
-            this.body.setActive(false);
-            Asteroids.remove(this);
-            released.add(this);
-        }
-    }
-
    public static Photon getProjectile() {
-        Photon photon = released.isEmpty() ? new Photon() : released.remove();
-        photon.body.setActive(true);
+        Photon photon = Asteroids.newEntity(Photon.class);
         photon.life = LIFE;
-        Asteroids.add(photon);
         return photon;
     }
     

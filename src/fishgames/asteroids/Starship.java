@@ -22,7 +22,7 @@ import org.lwjgl.util.vector.Vector3f;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Starship implements Object, Functor {
+public class Starship extends Entity implements Functor {
     private static Polygon hullPolygon;
     private static Polygon mainThrusterPolygon;
     private static Polygon shieldPolygon;
@@ -36,7 +36,6 @@ public class Starship implements Object, Functor {
     public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
     private Body body;
     private boolean flickerOn = true;
-    private boolean isThrusterOn;
     private float shieldLife;
     private String weapon = "Photon";
     private Vector3f color;
@@ -49,15 +48,14 @@ public class Starship implements Object, Functor {
             return true;
         }
     };
+    
     public Task hyperspaceTask = new Task(2.f) {
-
         @Override
         public boolean update() {
             return false;
         }
     };
     public Task rearmTask = new Task(0.2f) {
-
         @Override
         public boolean update() {
             return false;
@@ -153,7 +151,7 @@ public class Starship implements Object, Functor {
     }
 
     @Override
-    public void dispatch(Object obj) {
+    public void dispatch(Entity obj) {
         obj.dispatch(this);
     }
 
@@ -204,26 +202,9 @@ public class Starship implements Object, Functor {
     public float getShieldLife() {
         return this.shieldLife;
     }
-
-    
-    Explosion ex;
     
     public void destroy() {
-        if (this.ex == null || !this.ex.getBody().isActive()) {
-            ex = Explosion.getExplosion(3.f, this.body.getPosition());
-            ex.getColor().x = 1.f;
-            ex.getColor().y = .85f;
-            ex.getColor().z = .2f;
-            //Asteroids.remove(this);
-            //this.body.setActive(false);
-            /*
-            ex = Explosion.getExplosion(4.2f, this.body.getPosition());
-            ex.getColor().x = 1.f;
-            ex.getColor().y = .0f;
-            ex.getColor().z = .0f;*/
-        }
     }
-    
     
     /**
      * Returns the polygon shape for the hull of the starship.
