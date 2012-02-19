@@ -6,27 +6,42 @@
 package fishgames.asteroids;
 
 import java.nio.IntBuffer;
-import java.util.Collection;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.lwjgl.BufferUtils;
+import org.lwjgl.LWJGLException;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import static org.lwjgl.opengl.GL15.*;
+import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Renderer implements Functor {
+public class Renderer extends Task implements Functor {
 
-    private float interpolation; // Interpolation constant
-
-    public Renderer() {
-        DisplayMode mode = Display.getDisplayMode();
+    public Renderer() throws LWJGLException { 
+        super(0);
+        int width = (int) (Asteroids.getWorldSize().x * 10);
+        int height = (int) (Asteroids.getWorldSize().y * 10);
+        DisplayMode mode = new DisplayMode(width, height);
+        Display.setDisplayMode(mode);
+        Display.setFullscreen(false);
+        Display.setTitle("Asteroids");
+        try {
+            Display.create(new PixelFormat(8, 8, 8, 8, 4));
+        } catch (LWJGLException ex) {
+            Display.create(new PixelFormat(8, 8, 8, 8, 0));
+        }
+        Keyboard.create();
+        Mouse.create();
+        
         glClearColor(0.0f, 0, 0, 1.0f);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_LIGHTING);
@@ -39,16 +54,30 @@ public class Renderer implements Functor {
         glMatrixMode(GL_MODELVIEW);
     }
 
-    public void render(Collection<Entity> objects, float alpha) {
+    /**
+     * Renders one frame.  Closes the application if the window is closed.
+     * @return 
+     */
+    @Override
+    public boolean update() {
+        if (Display.isCloseRequested()) {
+            Display.destroy();
+            System.exit(0);
+        }
+        Asteroids.setPaused(!Display.isVisible());
+        
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
         glScalef(10.f, 10.f, 10.f);
-        this.interpolation = alpha;
 
-        for (Entity object : objects) {
+        for (Entity object : Asteroids.getActiveEntities()) {
             object.dispatch(this);
         }
+        
+        Display.update();
+        Display.sync(50);
         // DISPATCH
+        return true;
     }
 
     @Override
@@ -63,7 +92,7 @@ public class Renderer implements Functor {
         float alpha = obj.getLife() / Debris.LIFE;
 
         glPushMatrix();
-        setTransform(obj.getBody(), this.interpolation);
+        setTransform(obj.getBody(), Asteroids.getFrameInterpolation());
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glColor4f(.2f, .2f, .2f, alpha);
@@ -83,7 +112,7 @@ public class Renderer implements Functor {
         float alpha = obj.getLife() / Explosion.LIFE;
 
         glPushMatrix();
-        setTransform(obj.getBody(), this.interpolation);
+        setTransform(obj.getBody(), Asteroids.getFrameInterpolation());
         glScalef(scale, scale, scale);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -99,7 +128,7 @@ public class Renderer implements Functor {
         Polygon poly = Photon.getPolygon();
 
         glPushMatrix();
-        setTransform(obj.getBody(), this.interpolation);
+        setTransform(obj.getBody(), Asteroids.getFrameInterpolation());
         glColor4f(1.f, 1.f, 1.f, 1.f);
         drawSolid(poly);
         glPopMatrix();
@@ -119,7 +148,7 @@ public class Renderer implements Functor {
         }
 
         glPushMatrix();
-        setTransform(obj.getBody(), this.interpolation);
+        setTransform(obj.getBody(), Asteroids.getFrameInterpolation());
         glColor3f(.2f, .2f, .2f);
         drawSolid(poly);
         glColor3f(.6f, .6f, .6f);
@@ -139,7 +168,7 @@ public class Renderer implements Functor {
         Polygon shield = Starship.getShieldPolygon();
         Vector3f color = obj.getColor();
         glPushMatrix();
-        setTransform(obj.getBody(), this.interpolation);
+        setTransform(obj.getBody(), Asteroids.getFrameInterpolation());
         if (obj.isThrusterOn()) {
             glColor3f(1.f, .85f, .2f);
             drawSolid(thruster);

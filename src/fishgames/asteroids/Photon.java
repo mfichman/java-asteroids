@@ -23,7 +23,7 @@ public class Photon extends Entity implements Projectile  , Functor {
         this.body.setBullet(true);
         this.body.setUserData(this);
         this.life = LIFE;
-        Asteroids.addActiveObject(this);
+        Asteroids.addActiveEntity(this);
     }
 
     @Override

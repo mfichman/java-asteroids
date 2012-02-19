@@ -6,11 +6,6 @@ package fishgames.asteroids;
 
 import java.awt.FontFormatException;
 import java.io.IOException;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.DatagramChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
@@ -18,81 +13,153 @@ import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.*;
 import org.jbox2d.dynamics.contacts.Contact;
 import org.lwjgl.LWJGLException;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
-import org.lwjgl.opengl.DisplayMode;
-import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
  * Big huge static class to hold all the game-specific info, like world size,
- * pointers to useful active, utility methods, etc.
+ * pointers to useful activeEntities, utility methods, etc.
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Asteroids {
 
     private static World world = new World(new Vec2(0, 0), true);
-    private static Factory factory = new Factory();
-    private static Renderer renderer;
-    private static Serializer serializer = new Serializer();
-    private static Deserializer deserializer = new Deserializer();
-    private static Selector selector;
-    private static SocketAddress address;
-    private static Map<SocketAddress, Peer> peerByAddress = new HashMap<SocketAddress, Peer>();
-    private static Set<Entity> active = new HashSet<Entity>();
-    private static ArrayList<Entity> working = new ArrayList<Entity>();
-    private static long accum = 0;
+    private static Map<Class, Entity> cache = new HashMap<Class, Entity>();
+    private static short nextId;
+    private static Set<Entity> activeEntities = new HashSet<Entity>();
+    private static ArrayList<Entity> workingEntities = new ArrayList<Entity>();
+    private static PriorityQueue<Task> activeTasks = new PriorityQueue<Task>();
+    private static ArrayList<Task> workingTasks = new ArrayList<Task>();
+    private static long accumulator = 0;
     private static long last = System.nanoTime();
     private static float timestep = 1.f / 100.f;
-    private static boolean activeDirty = false;
+    private static float frameInterpolation;
+    private static boolean activeEntitiesDirty;
+    private static boolean paused;
     private static Random random = new Random();
-    private static byte[] tempArray = new byte[1024];
     public static final int BUFSIZE = 4096;
-    public static final byte MESSAGE_DATA = 2;
-    public static final byte MESSAGE_NEW = 3;
 
     /**
-     * Returns a random number between min and max.
+     * Creates a new object, or retrieves it from the cache if necessary.
+     * Objects are linked together in a linked list to save memory allocations
+     * of entry types in a linked list.
      *
-     * @param min
-     * @param max
-     * @return
-     */
-    public static int random(int min, int max) {
-        return (Math.abs(random.nextInt()) % (max - min + 1)) + min;
-    }
-    
-    /**
-     * Creates a new entity with the given class.
      * @param <T>
      * @param type
-     * @return 
+     * @return
      */
     public static <T> T newEntity(Class type) {
-        return factory.newEntity(type);
+        Entity ent = cache.get(type);
+        if (ent == null) {
+            try {
+                ent = (Entity) type.newInstance();
+                ent.setId(nextId++);
+                ent.getBody().setActive(false);
+            } catch (InstantiationException ex) {
+                throw new RuntimeException(ex);
+            } catch (IllegalAccessException ex) {
+                throw new RuntimeException(ex);
+            }
+        } else {
+            cache.put(type, ent.getNext());
+        }
+        ent.setActive(true);
+        return (T) ent;
     }
 
     /**
-     * Adds an object to the update and render list for the game.
+     * Releases this object so that it can be re-used later.
      *
-     * @param obj
+     * @param object
      */
-    public static void addActiveObject(Entity obj) {
-        active.add(obj);
-        activeDirty = true;
+    public static void delEntity(Entity object) {
+        Entity next = cache.get(object.getClass());
+        object.setNext(next);
+        cache.put(object.getClass(), object);
     }
 
     /**
-     * Removes an object from the update and render list for the game. The
-     * change to the list will be reflected at the next frame.
+     * Releases an entity, by adding it to the cache and disabling it. This
+     * entity will no longer be active in the physical simulation, nor visible
+     * to the renderer.
+     *
+     * @param object
+     */
+    public static void delActiveEntity(Entity object) {
+        activeEntities.remove(object);
+        activeEntitiesDirty = true;
+        if (object.getPeer() == null) {
+            delEntity(object);
+        }
+    }
+
+    /**
+     * Adds an object to the update and render list for the game. This entity
+     * will no longer be active in the physical simulation, nor visible to the
+     * renderer.
      *
      * @param obj
      */
-    public static void removeActiveObject(Entity obj) {
-        active.remove(obj);
-        activeDirty = true;
+    public static void addActiveEntity(Entity object) {
+        activeEntities.add(object);
+        activeEntitiesDirty = true;
+    }
+
+    /**
+     * Removes a task from the task list.
+     *
+     * @param task
+     */
+    public static void delTask(Task task) {
+        activeTasks.remove(task);
+    }
+
+    /**
+     * Adds a task to the task list. The tasks will be checked and executed each
+     * frame if they've reached the deadline.
+     */
+    public static void addTask(Task task) {
+        activeTasks.add(task);
+    }
+
+    /**
+     * Returns a list of activeEntities entities.
+     *
+     * @return
+     */
+    public static Collection<Entity> getActiveEntities() {
+        return activeEntities;
+    }
+
+    public static PriorityQueue<Task> getActiveTasks() {
+        return activeTasks;
+    }
+
+    /*
+     * Returns the interpolation factor, as a value between 0 and 1. The
+     * interpolation factor describes how close the current time is to the next
+     * physics timestep, allowing for very smooth interpolated animation.
+     */
+    public static float getFrameInterpolation() {
+        return frameInterpolation;
+    }
+
+    /**
+     * Returns true if the game is paused.
+     *
+     * @return
+     */
+    public static boolean isPaused() {
+        return paused;
+    }
+
+    /**
+     * Pauses or un-pauses the game.
+     *
+     * @param flag
+     */
+    public static void setPaused(boolean flag) {
+        paused = flag;
     }
 
     /**
@@ -103,7 +170,25 @@ public class Asteroids {
     public static Vec2 getWorldSize() {
         return new Vec2(80, 80);
     }
-    
+
+    /**
+     * Returns a getRandomInt number between min and max.
+     *
+     * @param min
+     * @param max
+     * @return
+     */
+    public static int getRandomInt(int min, int max) {
+        return (Math.abs(random.nextInt()) % (max - min + 1)) + min;
+    }
+
+    /**
+     * Returns a getRandomInt velocity with magnitude between min and max.
+     *
+     * @param min
+     * @param max
+     * @return
+     */
     public static Vec2 getRandomVel(float min, float max) {
         float speed = (float) (Math.random() * (max - min)) + min;
         float angle = (float) (2 * Math.PI * Math.random());
@@ -113,7 +198,7 @@ public class Asteroids {
     }
 
     /**
-     * Returns a random position on the map.
+     * Returns a getRandomInt position on the map.
      *
      * @return
      */
@@ -130,20 +215,6 @@ public class Asteroids {
      */
     public static World getWorld() {
         return world;
-    }
-    
-    /**
-     * Returns a peer by the address the peer is connecting from.
-     * @param address
-     * @return 
-     */
-    public static Peer getPeerByAddress(SocketAddress address) {
-        Peer peer = peerByAddress.get(address);
-        if (peer == null) {
-            peer = new Peer();
-            peerByAddress.put(address, peer);
-        }
-        return peer;
     }
 
     /**
@@ -226,8 +297,8 @@ public class Asteroids {
     public static void step() {
         getWorld().step(timestep, 8, 3);
         for (Contact c = getWorld().getContactList(); c != null; c = c.getNext()) {
-            java.lang.Object a = c.getFixtureA().getBody().getUserData();
-            java.lang.Object b = c.getFixtureB().getBody().getUserData();
+            Object a = c.getFixtureA().getBody().getUserData();
+            Object b = c.getFixtureB().getBody().getUserData();
             if (a != null && b != null && c.isTouching()) {
                 Functor ca = (Functor) a;
                 Functor cb = (Functor) b;
@@ -235,205 +306,57 @@ public class Asteroids {
                 cb.dispatch((Entity) ca);
             }
         }
-        for (Entity object : working) {
+        for (Entity object : workingEntities) {
             object.update(timestep);
         }
     }
 
     /**
-     * Updates all tasks. Find any tasks whose deadline has been reached, and
-     * executes those tasks.
+     * Updates all activeTasks. Find any activeTasks whose deadline has been
+     * reached, and executes those activeTasks.
      */
-    public static void updateTasks() {
-        long time = System.nanoTime();
-
-        // Update all current tasks
-        PriorityQueue<Task> tasks = Task.getActiveTasks();
-        while (!tasks.isEmpty() && tasks.peek().getDeadline() <= time) {
-            Task task = tasks.remove();
-            if (task.update()) {
-                task.setDeadline();
-                tasks.add(task);
-            } else {
-                task.setDeadline(0);
-            }
-        }
-    }
-
-    /**
-     * Reads a packet, which may contain one or more messages.
-     *
-     * @param channel
-     * @throws IOException
-     */
-    public static void readPacket(DatagramChannel channel) throws IOException {
-        ByteBuffer buffer = deserializer.getBuffer();
-        buffer.clear();
-        SocketAddress addr = channel.receive(buffer);
-        if (addr == null) {
-            return;
-        } else {
-            buffer.flip();
-        }
-
-        while (buffer.hasRemaining()) {
-            readMessage(buffer);
-        }
-    }
-
-    /**
-     * Reads a single message from a byte buffer. A single message may have one
-     * or more segments per object in the message.  The format of a message is:
-     * 
-     * type [1] length [2] payload [n]
-     *
-     * @param buffer
-     */
-    public static void readMessage(ByteBuffer buffer) {
-        byte type = buffer.get();
-        short length = buffer.getShort(buffer.position());
-        int start = buffer.position() + 2; // +2 for the length field itself.
-        
-        // Select the message to parse by using the 'type' field of the message.
-        switch(type) {
-            case MESSAGE_DATA:
-                readDataMessage(buffer);
-                break;
-            case MESSAGE_NEW:
-                readNewMessage(buffer);
-                break;
-        }
-        
-        if (buffer.position() != (start+length)) {
-            System.err.printf("Invalid message length.  Expected message "
-                + "length: %d.  Actual message length: %d", length, 
-                buffer.position() - start);
-        }
-        if (buffer.position() > (start+length)) {
-            throw new RuntimeException("Invalid message length");
-        }
-        
-        // Fast-forward to the end of the message if the message length was
-        // incorrect.
-        if (buffer.position() < (start+length)) {
-            buffer.position(start+length);
-        }
-    }
-    
-    /**
-     * De-serializes an array of object state.  Each object consists of one or
-     * more attributes.  The serializer de-serializes an object.  The format
-     * of a data message is:
-     * 
-     * length [2] (id [2] payload [n])+
-     * 
-     * Note that the 'type' message field is already parsed at this point.
-     * 
-     * @param buffer 
-     */
-    public static void readDataMessage(ByteBuffer buffer) {
-        // Before reading the message, mark all entities for release.  If any
-        // entity doesn't appear in the message, consider it deactivated.
-        Peer peer = getPeerByAddress(address);
-        for (Entity ent : peer.getEntities()) {
-            ent.setMarkedForRelease(true);
-        }
-        
-        short length = buffer.getShort();
-        while(buffer.position() < length) {
-            short id = buffer.getShort();
-            Entity ent = peer.getEntity(id);
-            if (ent == null) {
-                deserializer.dispatch(ent);
-            }
-            ent.setActive(true);
-            ent.setMarkedForRelease(false);
-        }
-        
-        for (Entity ent : peer.getEntities()) {
-            if (ent.isMarkedForRelease()) {
-                ent.setActive(false);
-            }
-        }
-    }
-    
-    /**
-     * De-serializes a request to create a new object.  The object was created
-     * on the remote side; this adds the object on the local side.   The format 
-     * of a "new" message is: 
-     *
-     * length [2] (id [2] length [2] name [n])+
-     * 
-     * Note that the 'type' message field is already parsed at this point.
-     * @param buffer 
-     */
-    public static void readNewMessage(ByteBuffer buffer) {
-        Peer peer = getPeerByAddress(address);
-        short length = buffer.getShort();
-        
-        while(buffer.position() < length) {
-            short id = buffer.getShort();
-            short typeNameLength = buffer.getShort();
-            buffer.get(tempArray, 0, typeNameLength);
-            String typeName = new String(tempArray, 0, typeNameLength);
-            peer.newEntity(id, typeName);
-        }
-    }
-
-    /**
-     * Updates the network by polling for read/write events. Serializes any
-     * active active that are deemed necessary for serialization. Also,
-     * de-multiplexes received messages.
-     */
-    public static void updateNetwork() throws IOException {
-        selector.selectNow();
-
-        Iterator<SelectionKey> i = selector.selectedKeys().iterator();
-        while (i.hasNext()) {
-            SelectionKey key = i.next();
-            i.remove();
-
-            if (key.isValid() && key.isReadable()) {
-                readPacket((DatagramChannel) key.channel());
-            }
-            if (key.isValid() && key.isWritable()) {
-                //DatagramChannel channel = (DatagramChannel) key.channel();
-            }
-        }
-    }
-
-    /**
-     * Update the game state if necessary, and render to the screen. Update the
-     * working object array if the object set was dirty.
-     */
-    public static void updateGame() {
+    public static void update() {
         long increment = (long) (timestep * 1000000000);
         long time = System.nanoTime();
-
-        if (!Display.isVisible()) {
+        if (isPaused()) {
             last = time;
             return;
         }
 
-        if (activeDirty) {
-            activeDirty = false;
-            working.clear();
-            working.addAll(Asteroids.active);
+        // Update the workingEntities set.  If the set is dirty, then clear it and
+        // rebuild the list of objects.
+        if (activeEntitiesDirty) {
+            activeEntitiesDirty = false;
+            workingEntities.clear();
+            workingEntities.addAll(Asteroids.activeEntities);
         }
 
-        // Update all active and tasks in the task queue.
-        accum += time - last;
-        while (accum >= increment) {
+        // Update all activeEntities and activeTasks in the task queue.
+        accumulator += time - last;
+        while (accumulator >= increment) {
             step();
-            accum -= increment;
+            accumulator -= increment;
+        }
+        last = time;
+        frameInterpolation = (float) accumulator / (float) increment;
+
+        // Update all current activeTasks        
+        while (!activeTasks.isEmpty() && activeTasks.peek().getDeadline() <= time) {
+            Task task = activeTasks.remove();
+            
+            
+            if (task.update()) {
+                task.setDeadline();
+                workingTasks.add(task);
+            } else {
+                task.setDeadline(0);
+            }
         }
 
-        // Render all active; be sure to pass the 'frame' remainder'
-        renderer.render(active, (float) accum / (float) increment);
-
-        Display.update();
-        Display.sync(50);
-        last = time;
+        for (Task task : workingTasks) {
+            activeTasks.add(task);
+        }
+        workingTasks.clear();
     }
 
     /**
@@ -443,33 +366,16 @@ public class Asteroids {
      */
     public static void main(String[] args) throws LWJGLException, IOException, FontFormatException {
         // TODO code application logic here
-        int width = (int) (Asteroids.getWorldSize().x * 10);
-        int height = (int) (Asteroids.getWorldSize().y * 10);
-        DisplayMode mode = new DisplayMode(width, height);
-        Display.setDisplayMode(mode);
-        Display.setFullscreen(false);
-        Display.setTitle("Asteroids");
-        try {
-            Display.create(new PixelFormat(8, 8, 8, 8, 4));
-        } catch (LWJGLException ex) {
-            Display.create(new PixelFormat(8, 8, 8, 8, 0));
-        }
-
-        renderer = new Renderer();
-        selector = Selector.open();
-
-        Keyboard.create();
-        Mouse.create();
-
         for (int i = 0; i < 8; i++) {
             Rock.Large.getRock(Asteroids.getRandomPos());
         }
-        addActiveObject(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
-        while (!Display.isCloseRequested()) {
-            updateTasks();
-            updateGame();
+
+        addTask(new Renderer());
+
+        addActiveEntity(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
+        while (true) {
+            update();
         }
-        Display.destroy();
     }
 }
 

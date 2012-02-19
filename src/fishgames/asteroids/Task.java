@@ -5,7 +5,6 @@
  */
 package fishgames.asteroids;
 
-import java.util.PriorityQueue;
 
 /**
  * A task is some periodic activity that runs every frame, or when scheduled.
@@ -67,10 +66,10 @@ public abstract class Task implements Comparable<Task> {
     public void setActive(boolean active) {
         if (active && this.deadline == 0) {
             this.setDeadline();
-            Task.getActiveTasks().add(this);
+            Asteroids.getActiveTasks().add(this);
         } else if (!active && this.deadline != 0) {
             this.deadline = 0;
-            Task.getActiveTasks().remove();
+            Asteroids.getActiveTasks().remove(this);
         }
     }
     
@@ -87,17 +86,6 @@ public abstract class Task implements Comparable<Task> {
      */
     @Override
     public int compareTo(Task other) {
-        return (int)(this.timeout - other.timeout);
+        return (int)(this.deadline - other.deadline);
     }
-    
-    /**
-     * @return the activeTasks
-     */
-    public static PriorityQueue<Task> getActiveTasks() {
-        return activeTasks;
-    }
-    
-    
-    private static PriorityQueue<Task> activeTasks = new PriorityQueue<Task>();
-
 }

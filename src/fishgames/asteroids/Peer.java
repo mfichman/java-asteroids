@@ -55,7 +55,7 @@ public class Peer {
                 return obj;
             } else {
                 obj = (Entity) type.newInstance();
-                Asteroids.addActiveObject(obj);
+                Asteroids.addActiveEntity(obj);
                 entity.add(obj);
                 return obj;
             }

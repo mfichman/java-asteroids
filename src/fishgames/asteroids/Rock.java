@@ -133,7 +133,7 @@ public abstract class Rock extends Entity implements Functor {
     }
 
     public static Polygon getRockPolygon(float radius, int segments) {
-        // Creates a rock polygon using random offsets around a circle 
+        // Creates a rock polygon using getRandomInt offsets around a circle 
         // generated as an n-gon.
 
         // Create one vertex per segment.  Each vertex has 2 coordinates.
@@ -200,7 +200,7 @@ public abstract class Rock extends Entity implements Functor {
         public void destroy() {
             if (this.body.isActive()) {
                 setActive(false);
-                for (int i = 0; i < Asteroids.random(2, 3); i++) {
+                for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
                     Small.getRock(this.body.getPosition());
                 }
             }
@@ -223,7 +223,7 @@ public abstract class Rock extends Entity implements Functor {
         public void destroy() {
             if (this.body.isActive()) {
                 setActive(false);
-                for (int i = 0; i < Asteroids.random(2, 3); i++) {
+                for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
                     Medium.getRock(this.body.getPosition());
                 }
             }
