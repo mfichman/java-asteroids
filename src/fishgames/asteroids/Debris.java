@@ -7,6 +7,7 @@ package fishgames.asteroids;
 
 import java.util.ArrayList;
 import org.jbox2d.common.Vec2;
+import org.jbox2d.dynamics.Body;
 
 /**
  *
@@ -24,9 +25,11 @@ public class Debris extends Entity {
     public static int MASK = 0;
     public static float LIFE = 0.55f;
     private float life;
+    private Body body;
     
     public Debris() {
         this.body = Asteroids.getBody(RADIUS - MARGIN, TYPE, MASK, DENSITY);
+        this.setSerializable(false);
         this.life = LIFE;
     }
     
@@ -47,6 +50,16 @@ public class Debris extends Entity {
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
+    }
+    
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    
+    public Body getBody() {
+        return this.body;
     }
     
     public float getLife() {

@@ -45,14 +45,6 @@ public abstract class Rock extends Entity implements Functor {
         this.radius = radius;
     }
 
-    public Body getBody() {
-        return this.body;
-    }
-
-    public float getRadius() {
-        return radius;
-    }
-
     /**
      * Updates the rock (and wraps the transform).
      *
@@ -93,8 +85,25 @@ public abstract class Rock extends Entity implements Functor {
     @Override
     public void visit(Starship obj) {
     }
-    
+
+    @Override
+    public void visit(Player other) {
+    }
+
     public abstract void destroy();
+
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    public Body getBody() {
+        return this.body;
+    }
+
+    public float getRadius() {
+        return radius;
+    }
 
     public static Polygon getLargePolygon(Rock rock) {
         // Select a polygon to render a rock, using the rock's hash code
@@ -177,12 +186,14 @@ public abstract class Rock extends Entity implements Functor {
         public void destroy() {
             if (this.body.isActive()) {
                 setActive(false);
-                for (int i = 0; i < 3; i++) {
-                    Debris.getDebris(this.body.getPosition());
+                if (this.isRemote()) {
+                   for (int i = 0; i < 3; i++) {
+                        Debris.getDebris(this.body.getPosition());
+                   }
                 }
             }
         }
-        
+
         public static Small getRock(Vec2 position) {
             Small rock = Asteroids.newEntity(Small.class);
             rock.body.setTransform(position, 0.f);
@@ -192,6 +203,7 @@ public abstract class Rock extends Entity implements Functor {
     }
 
     public static class Medium extends Rock {
+
         public Medium() {
             super(MEDIUM);
         }
@@ -200,12 +212,14 @@ public abstract class Rock extends Entity implements Functor {
         public void destroy() {
             if (this.body.isActive()) {
                 setActive(false);
-                for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
-                    Small.getRock(this.body.getPosition());
+                if (!isRemote()) {
+                    for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
+                        Small.getRock(this.body.getPosition());
+                    }
                 }
             }
         }
-        
+
         public static Medium getRock(Vec2 position) {
             Medium rock = Asteroids.newEntity(Medium.class);
             rock.body.setTransform(position, 0.f);
@@ -215,6 +229,7 @@ public abstract class Rock extends Entity implements Functor {
     }
 
     public static class Large extends Rock {
+
         public Large() {
             super(LARGE);
         }
@@ -223,12 +238,14 @@ public abstract class Rock extends Entity implements Functor {
         public void destroy() {
             if (this.body.isActive()) {
                 setActive(false);
-                for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
-                    Medium.getRock(this.body.getPosition());
+                if (!isRemote()) {
+                    for (int i = 0; i < Asteroids.getRandomInt(2, 3); i++) {
+                        Medium.getRock(this.body.getPosition());
+                    }
                 }
             }
         }
-        
+
         public static Large getRock(Vec2 position) {
             Large rock = Asteroids.newEntity(Large.class);
             rock.body.setTransform(position, 0.f);

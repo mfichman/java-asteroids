@@ -75,7 +75,7 @@ public class Renderer extends Task implements Functor {
         }
         
         Display.update();
-        Display.sync(50);
+        //Display.sync(50);
         // DISPATCH
         return true;
     }
@@ -189,6 +189,12 @@ public class Renderer extends Task implements Functor {
         }
         glPopMatrix();
     }
+    
+    @Override
+    public void visit(Player player) {
+        // Nothing for now.  Eventually, the score will be printed via this
+        // mechanism.
+    }
 
     private void drawOutline(Polygon obj) {
         // Draws a polygon outline using GL_LINE_LOOP     
@@ -260,16 +266,16 @@ public class Renderer extends Task implements Functor {
      */
     private void setTransform(Body body, float alpha) {
         float angle = body.getAngle();
-        //float angularVel = body.getAngularVelocity();
+        float angularVel = body.getAngularVelocity();
         //float angle1 = angle * (1 - alpha);
         //float angle2 = (angle + angularVel) * (alpha);
         //float finalAngle = angle1 + angle2;
-        float finalAngle = angle;
+        float finalAngle = Asteroids.slerp(angle, angle + angularVel * Asteroids.getTimestep(), alpha);
 
         Vec2 pos = body.getPosition();
         Vec2 linearVel = body.getLinearVelocity();
         Vec2 pos1 = pos.mul(1 - alpha);
-        Vec2 pos2 = (pos.add(linearVel.mul(1.f / 60.f))).mul(alpha);
+        Vec2 pos2 = (pos.add(linearVel.mul(Asteroids.getTimestep()))).mul(alpha);
         Vec2 finalPos = pos1.add(pos2);
         glTranslatef(finalPos.x, finalPos.y, 0.f);
         glRotatef((float) (finalAngle * 180.f / Math.PI), 0, 0, 1.f);

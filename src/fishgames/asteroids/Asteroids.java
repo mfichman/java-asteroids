@@ -5,7 +5,10 @@
 package fishgames.asteroids;
 
 import java.awt.FontFormatException;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.channels.Selector;
 import java.util.*;
 import org.jbox2d.collision.shapes.CircleShape;
 import org.jbox2d.collision.shapes.Shape;
@@ -13,7 +16,6 @@ import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.*;
 import org.jbox2d.dynamics.contacts.Contact;
 import org.lwjgl.LWJGLException;
-import org.lwjgl.util.vector.Vector3f;
 
 /**
  * Big huge static class to hold all the game-specific info, like world size,
@@ -23,6 +25,7 @@ import org.lwjgl.util.vector.Vector3f;
  */
 public class Asteroids {
 
+    private static Selector selector;
     private static World world = new World(new Vec2(0, 0), true);
     private static Map<Class, Entity> cache = new HashMap<Class, Entity>();
     private static short nextId;
@@ -33,11 +36,34 @@ public class Asteroids {
     private static long accumulator = 0;
     private static long last = System.nanoTime();
     private static float timestep = 1.f / 100.f;
+    private static float frameRate = 1.f / 50.f;
     private static float frameInterpolation;
     private static boolean activeEntitiesDirty;
     private static boolean paused;
+    private static Peer master;
     private static Random random = new Random();
     public static final int BUFSIZE = 4096;
+
+    /**
+     * Returns the selector used for game I/O operations.
+     *
+     * @return
+     */
+    public static Selector getSelector() {
+        return selector;
+    }
+    
+    public static Peer getMaster() {
+        return master;
+    }
+    
+    public static float getTimestep() {
+        return timestep;
+    }
+    
+    public static void setMaster(Peer peer) {
+        master = peer;
+    }
 
     /**
      * Creates a new object, or retrieves it from the cache if necessary.
@@ -54,7 +80,6 @@ public class Asteroids {
             try {
                 ent = (Entity) type.newInstance();
                 ent.setId(nextId++);
-                ent.getBody().setActive(false);
             } catch (InstantiationException ex) {
                 throw new RuntimeException(ex);
             } catch (IllegalAccessException ex) {
@@ -91,6 +116,77 @@ public class Asteroids {
         if (object.getPeer() == null) {
             delEntity(object);
         }
+    }
+
+    /**
+     * Interpolation using the spinor approach for two angles (a spinor is the
+     * 2D analog of a quaternion).
+     *
+     * @param angle1
+     * @param angle2
+     * @return
+     */
+    public static float slerp(float angle1, float angle2, float alpha) {
+        angle1 = (float) (angle1 % (Math.PI * 2));
+        angle2 = (float) (angle2 % (Math.PI * 2));
+        double d1 = Math.abs(angle1 - angle2);
+        double d2 = Math.abs(angle1 + Math.PI * 2 - angle2);
+        double d3 = Math.abs(angle1 - Math.PI * 2 - angle2);
+        
+        if (d1 < d2) {
+            if (d1 < d3) {
+                // Do nothing
+            } else {
+                // Case D3
+                angle2 += Math.PI * 2;
+            }
+        } else {
+            if (d2 < d3) {
+                // Case D2
+                angle1 += Math.PI * 2;
+            } else {
+                // Case D3
+                angle2 += Math.PI * 2;
+            }
+        }
+        
+        return (1 - alpha) * angle1 + (alpha) * angle2;
+        
+        
+        /*
+        double a1Real = Math.cos(angle1);
+        double a1Complex = Math.sin(angle1);
+        double a2Real = Math.cos(angle2);
+        double a2Complex = Math.sin(angle2);
+        
+        double cosom = a1Real * a2Real + a1Complex * a2Complex;
+        double tc;
+        double tr;
+        if (cosom < 0) {
+            cosom = -cosom;
+            tc = -a2Complex;
+            tr = -a2Real;
+        } else {
+            tc = a2Complex;
+            tr = a2Real;
+        }
+        
+        // Use linear interpolation if the angles are too close
+        Quaternion q;
+        double scale0;
+        double scale1;
+        if ((1 - cosom) > 0.001) {
+            double omega = Math.acos(cosom);
+            double sinom = Math.sin(omega);
+            scale0 = Math.sin((1 - alpha) * omega) / sinom;
+            scale1 = Math.sin(alpha * omega) / sinom;
+        } else {
+            scale0 = 1 - alpha;
+            scale1 = alpha;
+        }
+        double resultComplex = scale0 * a1Complex + scale1 * tc;
+        double resultReal = scale0 * a1Real + scale1 * tr;
+        return (float) Math.atan2(resultComplex, resultReal) * 2.f;*/
     }
 
     /**
@@ -230,6 +326,7 @@ public class Asteroids {
     public static Body getBody(Polygon polygon, int type, int mask, float density) {
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.DYNAMIC;
+        bodyDef.active = false;
         Body body = Asteroids.getWorld().createBody(bodyDef);
         if (polygon.getShapes() != null) {
             for (Shape shape : polygon.getShapes()) {
@@ -259,6 +356,7 @@ public class Asteroids {
         shape.m_radius = radius;
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.DYNAMIC;
+        bodyDef.active = false;
         Body body = Asteroids.getWorld().createBody(bodyDef);
         Fixture fixture = body.createFixture(shape, density);
         Filter filter = new Filter();
@@ -315,9 +413,10 @@ public class Asteroids {
      * Updates all activeTasks. Find any activeTasks whose deadline has been
      * reached, and executes those activeTasks.
      */
-    public static void update() {
+    public static void update() throws InterruptedException, IOException {
         long increment = (long) (timestep * 1000000000);
         long time = System.nanoTime();
+        long nextFrame = (long) (frameRate * 1000000000) + time;
         if (isPaused()) {
             last = time;
             return;
@@ -340,23 +439,41 @@ public class Asteroids {
         last = time;
         frameInterpolation = (float) accumulator / (float) increment;
 
-        // Update all current activeTasks        
+
+        // Update all current activeTasks 
+        long nextDeadline = Long.MAX_VALUE;
         while (!activeTasks.isEmpty() && activeTasks.peek().getDeadline() <= time) {
             Task task = activeTasks.remove();
-            
-            
+
+
             if (task.update()) {
                 task.setDeadline();
                 workingTasks.add(task);
+                if (task.getTimeout() != 0.f) {
+                    nextDeadline = Math.min(nextDeadline, task.getDeadline());
+                }
             } else {
                 task.setDeadline(0);
             }
         }
+        if (!activeTasks.isEmpty()) {
+            nextDeadline = Math.min(nextDeadline, activeTasks.peek().getDeadline());
+        }
 
+        // Add any tasks that ran in this frame and were re-scheduled to the
+        // priority queue.
         for (Task task : workingTasks) {
             activeTasks.add(task);
         }
         workingTasks.clear();
+
+        // Sleep until the next task
+        long wakeTime = Math.min(nextFrame, nextDeadline);
+        long sleepTime = (wakeTime - System.nanoTime()) / 1000000;
+        if (sleepTime > 0) {
+            //Thread.sleep(sleepTime / 1000000);
+            selector.select(sleepTime);
+        }
     }
 
     /**
@@ -364,16 +481,48 @@ public class Asteroids {
      *
      * @param args the command line arguments
      */
-    public static void main(String[] args) throws LWJGLException, IOException, FontFormatException {
-        // TODO code application logic here
-        for (int i = 0; i < 8; i++) {
-            Rock.Large.getRock(Asteroids.getRandomPos());
+    public static void main(String[] args) throws LWJGLException, IOException, FontFormatException, InterruptedException {
+        selector = Selector.open();
+        Entity.addType(Rock.Large.class);
+        Entity.addType(Rock.Medium.class);
+        Entity.addType(Rock.Small.class);
+        Entity.addType(Starship.class);
+        Entity.addType(Photon.class);
+        Entity.addType(Player.class);
+        //Entity.addType(Explosion.class);
+        //Entity.addType(Debris.class);
+
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        System.out.print("Master or client? ");
+        String answer = reader.readLine();
+
+
+        if (answer.equalsIgnoreCase("master") || answer.equalsIgnoreCase("m")) {
+            //addActiveEntity(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
+
+            addTask(new Network(true));
+            for (int i = 0; i < 8; i++) {
+                Rock.Large.getRock(Asteroids.getRandomPos());
+            }
+
+        } else {
+            Player player = Asteroids.newEntity(Player.class);
+            player.setActive(true);
+            addTask(new Renderer());
+            addTask(new Network(false));
         }
 
-        addTask(new Renderer());
+        //Starship starship = new Starship(new Vector3f(1.0f, 0.f, 0.0f));
+        //starship.setActive(true);
+        //Player player = Asteroids.newEntity(Player.class);
+        //player.setActive(true);
+        //player.setSerializable(false);
 
-        addActiveEntity(new Starship(new Vector3f(1.0f, 0.f, 0.0f)));
+        //addTask(new Renderer());
+
         while (true) {
+            //player.setInputFlags(player.getInputFlags());
             update();
         }
     }

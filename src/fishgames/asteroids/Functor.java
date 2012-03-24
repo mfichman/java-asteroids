@@ -17,4 +17,5 @@ public interface Functor {
     public void visit(Photon obj);
     public void visit(Rock obj);
     public void visit(Starship obj);
+    public void visit(Player obj);
 }

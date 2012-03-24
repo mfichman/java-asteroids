@@ -35,6 +35,7 @@ public class Serializer implements Functor {
     @Override
     public void visit(Photon obj) {
         visit(obj.getBody());
+        buffer.putFloat(obj.getLife());
     }
 
     @Override
@@ -45,6 +46,12 @@ public class Serializer implements Functor {
     @Override
     public void visit(Starship obj) {
         visit(obj.getBody());
+        buffer.put((byte) (obj.isThrusterOn() ? 1 : 0));
+    }
+    
+    @Override
+    public void visit(Player obj) {
+        buffer.put(obj.getInputFlags());
     }
 
     /**
@@ -60,6 +67,7 @@ public class Serializer implements Functor {
         buffer.putFloat(pos.y);
         buffer.putFloat(vel.x);
         buffer.putFloat(vel.y);
+        buffer.putFloat(body.getAngularVelocity());
         buffer.putFloat(body.getAngle());
     }
     

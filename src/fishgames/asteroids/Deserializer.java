@@ -24,27 +24,39 @@ public class Deserializer implements Functor {
 
     @Override
     public void visit(Debris obj) {
-        visit(obj.getBody());
+        visit(obj.getBody(), obj.isInitialized());
+        obj.setInitialized(true);
     }
 
     @Override
     public void visit(Explosion obj) {
-        visit(obj.getBody());
+        visit(obj.getBody(), obj.isInitialized());
+        obj.setInitialized(true);
     }
 
     @Override
     public void visit(Photon obj) {
-        visit(obj.getBody());
+        visit(obj.getBody(), obj.isInitialized());
+        obj.setLife(buffer.getFloat());
+        obj.setInitialized(true);
     }
 
     @Override
     public void visit(Rock obj) {
-        visit(obj.getBody());
+        visit(obj.getBody(), obj.isInitialized());
+        obj.setInitialized(true);
     }
 
     @Override
     public void visit(Starship obj) {
-        visit(obj.getBody());
+        visit(obj.getBody(), obj.isInitialized());
+        obj.setThrusterOn(buffer.get() != 0);
+        obj.setInitialized(true);
+    }
+
+    @Override
+    public void visit(Player obj) {
+        obj.setInputFlags(buffer.get());
     }
 
     /**
@@ -53,16 +65,44 @@ public class Deserializer implements Functor {
      *
      * @param body
      */
-    private void visit(Body body) {
+    private void visit(Body body, boolean initialized) {
+        float alpha = .0f;
+
+        float x = buffer.getFloat();
+        float y = buffer.getFloat();
+        float dx = buffer.getFloat();
+        float dy = buffer.getFloat();
+        
         Vec2 pos = body.getPosition();
         Vec2 vel = body.getLinearVelocity();
-        pos.x = buffer.getFloat();
-        pos.y = buffer.getFloat();
-        vel.x = buffer.getFloat();
-        vel.y = buffer.getFloat();
-        body.setTransform(pos, buffer.getFloat());
+
+        double dist = Math.sqrt((pos.x - x) * (pos.x - x) + (pos.y - y) * (pos.y - y));
+
+        if (initialized && dist < 0.2f) {
+            //System.out.printf("Net: %f, %f\n", x, y);
+            //System.out.printf("Local: %f, %f\n", pos.x, pos.y);
+            pos.x = (1 - alpha) * pos.x + (alpha) * x;
+            pos.y = (1 - alpha) * pos.y + (alpha) * y;
+        } else {
+            pos.x = x;
+            pos.y = y;
+        }
+        // Smooth the position vector
+
+            vel.x = dx;
+            vel.y = dy;
+
+        body.setAngularVelocity(buffer.getFloat());
+        float angle = buffer.getFloat();
+        
+        if (initialized) {
+            angle = Asteroids.slerp(body.getAngle(), angle, 0.2f);
+        }
+        
+        body.setLinearVelocity(vel);
+        body.setTransform(pos, angle);
     }
-    
+
     public ByteBuffer getBuffer() {
         return buffer;
     }

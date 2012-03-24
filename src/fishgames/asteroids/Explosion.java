@@ -6,6 +6,7 @@
 package fishgames.asteroids;
 
 import org.jbox2d.common.Vec2;
+import org.jbox2d.dynamics.Body;
 import org.jbox2d.dynamics.BodyDef;
 import org.jbox2d.dynamics.BodyType;
 import org.lwjgl.util.vector.Vector3f;
@@ -21,10 +22,12 @@ public class Explosion extends Entity {
     private float size;
     private float life;
     private Vector3f color;
+    private Body body;
 
     public Explosion() {
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.KINEMATIC;
+        bodyDef.active = false;
         this.body = Asteroids.getWorld().createBody(bodyDef);
         this.color = new Vector3f(1.f, 0.f, 0.f);
     }
@@ -41,6 +44,16 @@ public class Explosion extends Entity {
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
+    } 
+        
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    
+    public Body getBody() {
+        return this.body;
     }
 
     Vector3f getColor() {

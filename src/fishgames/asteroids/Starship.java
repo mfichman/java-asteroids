@@ -13,7 +13,6 @@ import org.jbox2d.collision.shapes.PolygonShape;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.input.Keyboard;
 import org.lwjgl.util.vector.Vector3f;
 
 /**
@@ -23,6 +22,7 @@ import org.lwjgl.util.vector.Vector3f;
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
 public class Starship extends Entity implements Functor {
+
     private static Polygon hullPolygon;
     private static Polygon mainThrusterPolygon;
     private static Polygon shieldPolygon;
@@ -31,14 +31,16 @@ public class Starship extends Entity implements Functor {
     public static float SPIN = 4.f;
     public static float DENSITY = 1.f;
     public static float SHIELD_LIFE = 0.2f;
-    public static Vec2 THRUST = new Vec2(0, 1.0f);
+    public static Vec2 THRUST = new Vec2(0, .5f);
     public static int TYPE = 0x2;
     public static int MASK = Starship.TYPE | Rock.TYPE | Projectile.TYPE;// | Upgrade.TYPE
     private Body body;
     private boolean flickerOn = true;
+    private boolean thrusterOn = false;
     private float shieldLife;
     private String weapon = "Photon";
     private Vector3f color;
+    
     
     public Task flickerTask = new Task(0.07f) {
 
@@ -48,14 +50,15 @@ public class Starship extends Entity implements Functor {
             return true;
         }
     };
-    
     public Task hyperspaceTask = new Task(2.f) {
+
         @Override
         public boolean update() {
             return false;
         }
     };
     public Task rearmTask = new Task(0.2f) {
+
         @Override
         public boolean update() {
             return false;
@@ -67,8 +70,8 @@ public class Starship extends Entity implements Functor {
      *
      * @param color
      */
-    public Starship(Vector3f color) {
-        this.color = color;
+    public Starship() {
+        this.color = new Vector3f(1.f, 0.f, 0.f);
         this.body = Asteroids.getBody(getHullPolygon(), TYPE, MASK, DENSITY);
         this.body.setTransform(Asteroids.getWorldSize().mul(.5f), .0f);
         this.body.setUserData(this);
@@ -83,35 +86,36 @@ public class Starship extends Entity implements Functor {
     @Override
     public void update(float delta) {
         this.shieldLife = Math.max(0.f, this.shieldLife - delta);
-        
+
         float speed = this.body.getLinearVelocity().length();
         float capped = Math.min(speed, MAXSPEED);
         if (speed > 0) {
             this.body.getLinearVelocity().x *= capped / speed;
             this.body.getLinearVelocity().y *= capped / speed;
         }
-        
-        Vec2 forward = this.body.getWorldVector(THRUST);
-        if (Keyboard.isKeyDown(Keyboard.KEY_I)) {
-            this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_K)) {
-            this.body.applyLinearImpulse(forward, this.body.getWorldCenter());
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_J) && !Keyboard.isKeyDown(Keyboard.KEY_L)) {
-            this.body.setAngularVelocity(-SPIN);
-        } else if (Keyboard.isKeyDown(Keyboard.KEY_L) && !Keyboard.isKeyDown(Keyboard.KEY_J)) {
-            this.body.setAngularVelocity(SPIN);
-        } else {
-            this.body.setAngularVelocity(0.f);
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_H)) {
-            hyperjump();
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
-            fire();
-        }
         Asteroids.wrapTransform(this.body);
+    }
+    
+    public void thrust() { 
+        Vec2 forward = this.body.getWorldVector(THRUST);
+        this.body.applyLinearImpulse(forward.negate(), this.body.getWorldCenter());
+    }
+    
+    public void brake() {
+        Vec2 forward = this.body.getWorldVector(THRUST);
+        this.body.applyLinearImpulse(forward, this.body.getWorldCenter());
+    }
+    
+    public void rotateLeft() {
+        this.body.setAngularVelocity(-SPIN);
+    }
+    
+    public void rotateRight() {
+        this.body.setAngularVelocity(SPIN);
+    }
+    
+    public void stopRotation() {
+        this.body.setAngularVelocity(0);
     }
 
     public void hyperjump() {
@@ -143,8 +147,7 @@ public class Starship extends Entity implements Functor {
         } catch (InvocationTargetException ex) {
         }
     }
-    
-    
+
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
@@ -162,7 +165,7 @@ public class Starship extends Entity implements Functor {
     @Override
     public void visit(Explosion obj) {
     }
-    
+
     @Override
     public void visit(Photon obj) {
         this.shieldLife = SHIELD_LIFE;
@@ -179,33 +182,47 @@ public class Starship extends Entity implements Functor {
         this.shieldLife = SHIELD_LIFE;
     }
     
+    @Override
+    public void visit(Player other) {
+    }
+
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    
     public Vector3f getColor() {
         return this.color;
     }
-    
+
     public Body getBody() {
         return this.body;
     }
-    
+
     public boolean isShieldVisible() {
         return this.shieldLife > 0.f;
     }
 
     public boolean isThrusterOn() {
-        return Keyboard.isKeyDown(Keyboard.KEY_I);
+        return this.thrusterOn;
     }
-    
+
     public boolean isFlickerOn() {
         return this.flickerOn || !this.flickerTask.isActive();
     }
     
+    public void setThrusterOn(boolean on) {
+        this.thrusterOn = on;
+    }
+
     public float getShieldLife() {
         return this.shieldLife;
     }
-    
+
     public void destroy() {
     }
-    
+
     /**
      * Returns the polygon shape for the hull of the starship.
      *
