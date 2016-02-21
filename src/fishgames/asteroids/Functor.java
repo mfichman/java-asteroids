@@ -11,10 +11,11 @@ package fishgames.asteroids;
  */
 public interface Functor {  
     
-    public void dispatch(Object obj);
+    public void dispatch(Entity obj);
     public void visit(Debris obj);    
     public void visit(Explosion obj);
     public void visit(Photon obj);
     public void visit(Rock obj);
     public void visit(Starship obj);
+    public void visit(Player obj);
 }

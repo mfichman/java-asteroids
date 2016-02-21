@@ -6,8 +6,6 @@
 package fishgames.asteroids;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Queue;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 
@@ -17,10 +15,9 @@ import org.jbox2d.dynamics.Body;
  */
 
 
-public class Debris implements Object {
+public class Debris extends Entity {
     
-    private static Queue<Debris> released = new LinkedList<Debris>();
-    private static ArrayList<Polygon> debrisPolygon;
+    private static ArrayList<Polygon> polygon;
     public static float DENSITY = 1.0f;
     public static float MARGIN = 0.05f;
     public static float RADIUS = 1.f;
@@ -32,6 +29,7 @@ public class Debris implements Object {
     
     public Debris() {
         this.body = Asteroids.getBody(RADIUS - MARGIN, TYPE, MASK, DENSITY);
+        this.setSerializable(false);
         this.life = LIFE;
     }
     
@@ -45,7 +43,7 @@ public class Debris implements Object {
         Asteroids.wrapTransform(this.body);
         this.life = Math.max(0.f, this.life - delta);
         if (this.life <= 0.f) {
-            release();
+            setActive(false);
         }
     }
     
@@ -54,41 +52,27 @@ public class Debris implements Object {
         func.visit(this);
     }
     
-    /**
-     * Releases the object (so it won't render).
-     */
-    public void release() {
-        if (this.body.isActive()) {
-            this.body.setActive(false);
-            Asteroids.remove(this);
-            released.add(this);
-        }
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    
+    public Body getBody() {
+        return this.body;
     }
     
     public float getLife() {
         return life;
     }
 
-    public Body getBody() {
-        return body;
-    }
-    
     public static Debris getDebris(Vec2 position) {
-        Debris debris = released.isEmpty() ? new Debris() : released.remove(); 
-        
+        Debris debris = Asteroids.newEntity(Debris.class);
         float minSpeed = 9.f;
         float maxSpeed = 12.f;
-        float speed = (float) (Math.random() * (maxSpeed - minSpeed)) + minSpeed;
-        float angle = (float) (2 * Math.PI * Math.random());
-        float dx = (float) (speed * Math.cos(angle));
-        float dy = (float) (speed * Math.sin(angle));
-        
-        debris.body.setLinearVelocity(new Vec2(dx, dy));
+        debris.body.setLinearVelocity(Asteroids.getRandomVel(minSpeed, maxSpeed));
         debris.body.setTransform(position, debris.body.getAngle());
-        debris.body.setActive(true);
         debris.life = LIFE;
-        Asteroids.add(debris);
-        
         return debris;
     }
     
@@ -101,14 +85,14 @@ public class Debris implements Object {
     public static Polygon getPolygon(Debris debris) {
         // Select a polygon to render a debris object given the debris object's
         // hash code.
-        if (debrisPolygon == null) {
-            debrisPolygon = new ArrayList<Polygon>();
+        if (polygon == null) {
+            polygon = new ArrayList<Polygon>();
             for (int i = 0; i < 8; ++i) {
-                debrisPolygon.add(getPolygon());
+                polygon.add(getPolygon());
             }
         }
-        int index = debris.hashCode() % debrisPolygon.size();
-        return debrisPolygon.get(index);
+        int index = debris.hashCode() % polygon.size();
+        return polygon.get(index);
     }
 
 

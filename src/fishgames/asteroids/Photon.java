@@ -5,8 +5,6 @@
  */
 package fishgames.asteroids;
 
-import java.util.LinkedList;
-import java.util.Queue;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 
@@ -14,21 +12,21 @@ import org.jbox2d.dynamics.Body;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Photon implements Projectile, Object, Functor {
-    private static Queue<Photon> released = new LinkedList<Photon>();
+public class Photon extends Entity implements Projectile, Functor {
+
     private static Polygon photonPolygon;
     public static float SCALE = .2f;
     public static float SPEED = 40.f;
     public static float LIFE = 1.8f;
-    private Body body;
     public float life;
+    private Body body;
 
     public Photon() {
         this.body = Asteroids.getBody(getPolygon(), TYPE, MASK, SCALE);
         this.body.setBullet(true);
         this.body.setUserData(this);
         this.life = LIFE;
-        Asteroids.add(this);
+        Asteroids.addActiveEntity(this);
     }
 
     @Override
@@ -38,6 +36,10 @@ public class Photon implements Projectile, Object, Functor {
         if (life <= 0.f) {
             destroy();
         }
+    }
+
+    public void setLife(float life) {
+        this.life = life;
     }
 
     @Override
@@ -52,6 +54,20 @@ public class Photon implements Projectile, Object, Functor {
     }
 
     @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
+    }
+    
+    public float getLife() {
+        return this.life;
+    }
+
+    public Body getBody() {
+        return this.body;
+    }
+
+    @Override
     public float getDamage() {
         return 1.f;
     }
@@ -60,18 +76,14 @@ public class Photon implements Projectile, Object, Functor {
     public float getRearmTime() {
         return .1f;
     }
-   
-    public Body getBody() {
-        return this.body;
-    }
 
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
     }
-    
+
     @Override
-    public void dispatch(Object obj) {
+    public void dispatch(Entity obj) {
         obj.dispatch(this);
     }
 
@@ -82,7 +94,7 @@ public class Photon implements Projectile, Object, Functor {
     @Override
     public void visit(Explosion obj) {
     }
-    
+
     @Override
     public void visit(Photon other) {
     }
@@ -93,41 +105,37 @@ public class Photon implements Projectile, Object, Functor {
     }
 
     @Override
+    public void visit(Player other) {
+    }
+
+    @Override
     public void visit(Starship other) {
         destroy();
     }
 
     public void destroy() {
         if (this.body.isActive()) {
-            release();
-            Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
-            ex.getColor().x = 1.f;
-            ex.getColor().y = .85f;
-            ex.getColor().z = .2f;
+            setActive(false);
+            if (this.isRemote()) {
+                Explosion ex = Explosion.getExplosion(.1f, this.body.getPosition());
+                ex.setSerializable(false);
+                ex.getColor().x = 1.f;
+                ex.getColor().y = .85f;
+                ex.getColor().z = .2f;
+            }
         }
     }
 
-    public void release() {
-        if (this.body.isActive()) {
-            this.body.setActive(false);
-            Asteroids.remove(this);
-            released.add(this);
-        }
-    }
-
-   public static Photon getProjectile() {
-        Photon photon = released.isEmpty() ? new Photon() : released.remove();
-        photon.body.setActive(true);
+    public static Photon getProjectile() {
+        Photon photon = Asteroids.newEntity(Photon.class);
         photon.life = LIFE;
-        Asteroids.add(photon);
         return photon;
     }
-    
+
     public static Polygon getPolygon() {
         if (photonPolygon == null) {
             photonPolygon = Polygon.getSquare(Photon.SCALE);
         }
         return photonPolygon;
     }
-
 }

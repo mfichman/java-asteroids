@@ -5,8 +5,6 @@
  */
 package fishgames.asteroids;
 
-import java.util.LinkedList;
-import java.util.Queue;
 import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.jbox2d.dynamics.BodyDef;
@@ -17,18 +15,19 @@ import org.lwjgl.util.vector.Vector3f;
  *
  * @author Matt Fichman <matt.fichman@gmail.com>
  */
-public class Explosion implements Object {
-    private static Queue<Explosion> released = new LinkedList<Explosion>();
+public class Explosion extends Entity {
+
     private static Polygon explosionPolygon;
     public static float LIFE = .2f;
-    private Body body;
     private float size;
     private float life;
     private Vector3f color;
-    
+    private Body body;
+
     public Explosion() {
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyType.KINEMATIC;
+        bodyDef.active = false;
         this.body = Asteroids.getWorld().createBody(bodyDef);
         this.color = new Vector3f(1.f, 0.f, 0.f);
     }
@@ -40,17 +39,23 @@ public class Explosion implements Object {
         if (this.life <= 0.f) {
             destroy();
         }
-    }    
-    
+    }
+
     @Override
     public void dispatch(Functor func) {
         func.visit(this);
+    } 
+        
+    @Override
+    public void setActive(boolean active) {
+        super.setActive(active);
+        this.body.setActive(active);
     }
     
     public Body getBody() {
         return this.body;
     }
-    
+
     Vector3f getColor() {
         return this.color;
     }
@@ -64,26 +69,16 @@ public class Explosion implements Object {
     }
 
     public void destroy() {
-        release();
+        setActive(false);
     }
 
-    public void release() {
-        if (this.getBody().isActive()) {
-            this.getBody().setActive(false);
-            Asteroids.remove(this);
-            released.add(this);
-        }
-    }
-    
     public static Explosion getExplosion(float size, Vec2 pos) {
-        Explosion exp = released.isEmpty() ? new Explosion() : released.remove();
-        exp.getBody().setActive(true);
+        Explosion exp = Asteroids.newEntity(Explosion.class);
         exp.life = LIFE;
         exp.size = size;
         exp.getBody().setTransform(pos, 0.f);
-        Asteroids.add(exp);
         return exp;
-    }  
+    }
 
     public static Polygon getPolygon() {
         if (explosionPolygon == null) {
